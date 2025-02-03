@@ -203,11 +203,10 @@ You may reference lines precisely now.`,
         return
 
       if (evt.event === 'stopped') {
-        // 4) Gather paused state. This is also where you can feed the structured code again or partial references
+        // 4) Gather paused state
         const pausedState = await gatherPausedState(session)
-        // Optionally, mark breakpoints in code lines if you like:
-        markBreakpointsInCode(structuredCode, pausedState.breakpoints)
 
+        markBreakpointsInCode(structuredCode, pausedState.breakpoints)
         const pausedMessage: ChatCompletionMessageParam = {
           role: 'user',
           content: `
@@ -244,16 +243,16 @@ Choose next action by calling setBreakpoint, removeBreakpoint, stepOver, stepIn,
               await removeBreakpoint(argsStr)
               break
             case 'stepOver':
-              await session.customRequest('next')
+              await stepOver()
               break
             case 'stepIn':
-              await session.customRequest('stepIn')
+              await stepIn()
               break
             case 'stepOut':
-              await session.customRequest('stepOut')
+              await stepOut()
               break
             case 'continueExec':
-              await session.customRequest('continue')
+              await continueExec()
               break
           }
         }
@@ -377,11 +376,8 @@ async function removeBreakpoint(functionArgsString: string) {
       if (bp instanceof vscode.SourceBreakpoint) {
         const thisFile = bp.location.uri.fsPath
         const thisLine = bp.location.range.start.line + 1
-        // Compare by absolute or endsWith, depending on your preference
-        if (thisFile === file || thisFile.endsWith(file)) {
-          if (thisLine === line)
-            toRemove.push(bp)
-        }
+        if ((thisFile === file || thisFile.endsWith(file)) && thisLine === line)
+          toRemove.push(bp)
       }
     }
 
@@ -398,6 +394,68 @@ async function removeBreakpoint(functionArgsString: string) {
   catch (err) {
     outputChannel.appendLine(`Failed to remove breakpoint: ${String(err)}`)
     vscode.window.showErrorMessage(`Failed to remove breakpoint: ${String(err)}`)
+  }
+}
+
+// Implementation of stepOver, stepIn, stepOut, continueExec
+
+async function stepOver() {
+  const session = vscode.debug.activeDebugSession
+  if (!session) {
+    outputChannel.appendLine('Cannot step over. No active debug session.')
+    return
+  }
+  try {
+    await session.customRequest('next')
+    outputChannel.appendLine('Stepped over the current line.')
+  }
+  catch (err) {
+    outputChannel.appendLine(`Failed to step over: ${String(err)}`)
+  }
+}
+
+async function stepIn() {
+  const session = vscode.debug.activeDebugSession
+  if (!session) {
+    outputChannel.appendLine('Cannot step in. No active debug session.')
+    return
+  }
+  try {
+    await session.customRequest('stepIn')
+    outputChannel.appendLine('Stepped into the current function call.')
+  }
+  catch (err) {
+    outputChannel.appendLine(`Failed to step in: ${String(err)}`)
+  }
+}
+
+async function stepOut() {
+  const session = vscode.debug.activeDebugSession
+  if (!session) {
+    outputChannel.appendLine('Cannot step out. No active debug session.')
+    return
+  }
+  try {
+    await session.customRequest('stepOut')
+    outputChannel.appendLine('Stepped out of the current function call.')
+  }
+  catch (err) {
+    outputChannel.appendLine(`Failed to step out: ${String(err)}`)
+  }
+}
+
+async function continueExec() {
+  const session = vscode.debug.activeDebugSession
+  if (!session) {
+    outputChannel.appendLine('Cannot continue. No active debug session.')
+    return
+  }
+  try {
+    await session.customRequest('continue')
+    outputChannel.appendLine('Continued execution.')
+  }
+  catch (err) {
+    outputChannel.appendLine(`Failed to continue: ${String(err)}`)
   }
 }
 
