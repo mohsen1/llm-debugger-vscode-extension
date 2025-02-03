@@ -1,16 +1,16 @@
 {
   "compilerOptions": {
-    "module": "esnext",
     "target": "es2020",
     "lib": ["esnext"],
-    "strict": true,
+    "rootDir": ".",
+    "module": "esnext",
     "moduleResolution": "node",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
     "types": ["vscode", "node", "vitest"],
+    "strict": true,
     "outDir": "out",
     "sourceMap": true,
-    "rootDir": "." 
+    "esModuleInterop": true,
+    "skipLibCheck": true
   },
   "include": [
     "src/**/*",

@@ -1,0 +1,7 @@
+{
+  "name": "array-example",
+  "type": "module",
+  "scripts": {
+    "test": "node array.test.js"
+  }
+}
