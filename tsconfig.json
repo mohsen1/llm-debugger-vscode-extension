@@ -1,14 +1,25 @@
 {
   "compilerOptions": {
-    "target": "es2017",
-    "lib": ["esnext"],
     "module": "esnext",
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
+    "target": "es2020",
+    "lib": ["esnext"],
     "strict": true,
-    "strictNullChecks": true,
+    "moduleResolution": "node",
     "esModuleInterop": true,
-    "skipDefaultLibCheck": true,
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+    "types": ["vscode", "node", "vitest"],
+    "outDir": "out",
+    "sourceMap": true,
+    "rootDir": "." 
+  },
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "tsup.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "out"
+  ]
 }
