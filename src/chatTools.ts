@@ -5,13 +5,14 @@ import path from 'node:path'
 import { OpenAI } from 'openai'
 import type { ChatCompletion } from 'openai/resources/chat/completions'
 import type { ChatCompletionMessageParam, ChatCompletionTool } from './types'
+import * as log from './log'
 
 export const systemMessage: ChatCompletionMessageParam = {
   role: 'system' as const,
   content: 'You are an AI assistant that decides debugging steps. Suggest at least one breakpoint before launch.',
 }
 
-export const debugFunctions: ChatCompletionTool[] = [
+export const breakpointFunctions: ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
@@ -39,6 +40,9 @@ export const debugFunctions: ChatCompletionTool[] = [
       },
     },
   },
+]
+
+export const debugFunctions: ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
@@ -73,7 +77,7 @@ export const debugFunctions: ChatCompletionTool[] = [
   },
 ]
 
-export async function callLlm(prompt: string): Promise<ChatCompletion> {
+export async function callLlm(prompt: string, functions?: ChatCompletionTool[]): Promise<ChatCompletion> {
   const promptCacheFile = path.join(os.homedir(), '.llm-debugger-prompt-cache.json')
   if (!fs.existsSync(promptCacheFile)) {
     fs.writeFileSync(promptCacheFile, JSON.stringify([], null, 2))
@@ -92,10 +96,13 @@ export async function callLlm(prompt: string): Promise<ChatCompletion> {
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o',
-    tools: debugFunctions,
+    tools: functions,
     messages: [systemMessage, userMessage],
-    tool_choice: 'auto',
+    tool_choice: 'required',
+    max_tokens: 1000, // quick tool calls
   })
+
+  log.info(completion.choices[0].message.content || '')
 
   cache.set(prompt, completion)
   fs.writeFileSync(promptCacheFile, JSON.stringify(Array.from(cache.entries()), null, 2))

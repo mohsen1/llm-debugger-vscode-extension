@@ -1,5 +1,6 @@
 import type { ChatCompletionSystemMessageParam } from 'openai/resources'
 import type { PausedState, StructuredCode } from './types'
+import * as log from './log'
 
 export const systemMessage: ChatCompletionSystemMessageParam = {
   role: 'system',
@@ -11,7 +12,7 @@ export function getInitialBreakpointsMessage(structuredCode: StructuredCode[]): 
     'Here is the workspace code in a structured format (filePath -> [lines]):',
     serializeStructuredCode(structuredCode),
     '',
-    'Please decide on an initial breakpoint by calling setBreakpoint (and optionally more).',
+    'Decide on an initial breakpoint by calling setBreakpoint on a line in the code the is most likely to be the root cause of the problem.',
     'You may reference lines precisely now.',
   ].join('\n')
 }
@@ -40,6 +41,9 @@ function serializeBreakpoints(breakpoints: PausedState['breakpoints']) {
 }
 
 function serializeStructuredCode(structuredCode: StructuredCode[]) {
-  return structuredCode.map(({ filePath, lines }) => `${filePath}\n${lines.map(({ lineNumber, text }) =>
+  const serialized = structuredCode.map(({ filePath, lines }) => `${filePath}\n${lines.map(({ lineNumber, text }) =>
     `${String(lineNumber).padStart(3, ' ')}| ${text}`).join('\n')}`).join('\n\n')
+
+  log.debug('\n', serialized)
+  return serialized
 }

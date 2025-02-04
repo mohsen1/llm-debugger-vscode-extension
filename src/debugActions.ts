@@ -5,7 +5,6 @@ import { debug, error, info, warn } from './log'
 
 export async function setBreakpoint(functionArgsString: string) {
   try {
-    debug(`Setting breakpoint: ${functionArgsString}`)
     const { file, line } = JSON.parse(functionArgsString)
     let fullPath = file
     if (!path.isAbsolute(file) && vscode.workspace.workspaceFolders?.length) {
@@ -19,8 +18,6 @@ export async function setBreakpoint(functionArgsString: string) {
     const breakpoint = new vscode.SourceBreakpoint(location, true)
 
     vscode.debug.addBreakpoints([breakpoint])
-    info(`Breakpoint set at ${file}:${line}`)
-    // vscode.window.showInformationMessage(`Breakpoint set at ${file}:${line}`)
   }
   catch (err) {
     error(`Failed to set breakpoint: ${String(err)}`)
@@ -122,21 +119,17 @@ export async function continueExec() {
   }
 }
 
-export async function handleLlmFunctionCall(completion: ChatCompletion, {
-  callAllFunctions = false,
-}: {
-  callAllFunctions?: boolean
-} = {}) {
+export async function handleLlmFunctionCall(completion: ChatCompletion) {
   const choice = completion?.choices?.[0]
   if (!choice) {
     debug(`No choice found in completion. ${JSON.stringify(completion)}`)
-    return
+    return { shouldContinue: true }
   }
-  const finishReason = choice.finish_reason
 
   for (const toolCall of choice.message?.tool_calls || []) {
     const { name, arguments: argsStr } = toolCall.function
-    debug(`Handling tool call: ${name} ${argsStr}`)
+    info(`${name}(${argsStr || ''})`)
+
     switch (name) {
       case 'setBreakpoint':
         await setBreakpoint(argsStr)
@@ -156,13 +149,9 @@ export async function handleLlmFunctionCall(completion: ChatCompletion, {
       case 'continueExec':
         await continueExec()
         break
+      default:
+        break
     }
-    if (!callAllFunctions)
-      break
-  }
-
-  if (finishReason === 'stop') {
-    debug('LLM indicated to stop debugging actions.')
   }
 }
 
@@ -203,7 +192,14 @@ export async function gatherPausedState(session: vscode.DebugSession) {
     }
   }
   catch (e) {
-    error(`Failed to gather paused stack or variables: ${String(e)}`)
+    if (String(e).includes('Thread is not paused')) {
+      debug('gatherPausedState: Thread is not paused, paused state is not available.')
+      // Set a default value for pausedStack since no stack trace is available.
+      pausedStack = []
+    }
+    else {
+      error(`Failed to gather paused stack or variables: ${String(e)}`)
+    }
   }
 
   return { breakpoints, pausedStack, topFrameVariables }
