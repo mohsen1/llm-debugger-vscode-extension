@@ -80,6 +80,7 @@
     "release": "bumpp && nr publish"
   },
   "dependencies": {
+    "@vscode/debugadapter": "^1.68.0",
     "openai": "^4.82.0"
   },
   "devDependencies": {

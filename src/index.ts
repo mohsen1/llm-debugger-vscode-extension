@@ -2,13 +2,13 @@ import * as vscode from 'vscode'
 import { breakpointFunctions, callLlm, debugFunctions } from './chatTools'
 import { gatherWorkspaceCode } from './codeParser'
 import {
-  gatherPausedState,
   handleLlmFunctionCall,
   markBreakpointsInCode,
 } from './debugActions'
 import { getInitialBreakpointsMessage, getPausedMessage } from './prompts'
 import type { StructuredCode } from './types'
 import * as log from './log'
+import { gatherPausedState } from './state'
 
 // Store the structured code so we can annotate breakpoints on it whenever we pause
 const structuredCode: StructuredCode[] = []
@@ -44,6 +44,8 @@ function debugLoop() {
 
     await handleLlmFunctionCall(pausedResponse)
 
+    log.debug('LLM function call handled.')
+
     if (live)
       loop(session)
   }
@@ -52,16 +54,19 @@ function debugLoop() {
     live = false
   }
 
-  return { stop, loop }
+  function start(session: vscode.DebugSession) {
+    live = true
+    return loop(session)
+  }
+
+  return { stop, start }
 }
 
 export function activate(context: vscode.ExtensionContext) {
   log.debug('LLM Debugger activated.')
 
   const command = vscode.commands.registerCommand('llm-debugger.startLLMDebug', async () => {
-    const { stop, loop } = debugLoop()
-
-    log.clear()
+    const { stop, start } = debugLoop()
 
     const disposable = vscode.debug.registerDebugAdapterTrackerFactory('pwa-node', {
       createDebugAdapterTracker(session: vscode.DebugSession) {
@@ -71,7 +76,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (session.parentSession) {
               await session.parentSession.customRequest('pause')
               await setupInitialBreakpoints()
-              await loop(session)
+              await start(session)
             }
             await session.customRequest('pause')
           },
@@ -79,8 +84,9 @@ export function activate(context: vscode.ExtensionContext) {
       },
     })
 
+    log.clear()
     // Now launch the actual debug session
-    const started = await vscode.debug.startDebugging(undefined, {
+    await vscode.debug.startDebugging(undefined, {
       type: 'pwa-node',
       request: 'launch',
       name: 'LLM Debugger',
@@ -88,11 +94,6 @@ export function activate(context: vscode.ExtensionContext) {
       program: '${workspaceFolder}/array.test.js',
       env: { NODE_ENV: 'test' },
     })
-
-    if (!started) {
-      log.error('Failed to start debug session.')
-      return
-    }
 
     // If the session ends, we can do any cleanup
     vscode.debug.onDidTerminateDebugSession((_) => {

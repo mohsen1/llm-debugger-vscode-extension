@@ -14,8 +14,8 @@ This is a VSCode extension that allows you to debug your code using an LLM.
 
 <!-- commands -->
 
-| Command                      | Title           |
-| ---------------------------- | --------------- |
-| `llm-debugger.startLLMDebug` | Start LLM Debug |
+| Command                      | Title                   |
+| ---------------------------- | ----------------------- |
+| `llm-debugger.startLLMDebug` | Start LLM Debug Session |
 
 <!-- commands -->

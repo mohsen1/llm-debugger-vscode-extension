@@ -156,56 +156,6 @@ export async function handleLlmFunctionCall(completion: ChatCompletion) {
 }
 
 /**
- * Gathers current breakpoints, stack, and top-level variables.
- */
-export async function gatherPausedState(session: vscode.DebugSession) {
-  const breakpoints = vscode.debug.breakpoints
-    .map((bp) => {
-      if (bp instanceof vscode.SourceBreakpoint) {
-        return {
-          file: bp.location.uri.fsPath,
-          line: bp.location.range.start.line + 1,
-        }
-      }
-      return null
-    })
-    .filter((bp): bp is { file: string, line: number } => bp !== null)
-
-  let pausedStack = null
-  const topFrameVariables: any[] = []
-  try {
-    const stackTrace = await session.customRequest('stackTrace', { threadId: 1 })
-    pausedStack = stackTrace.stackFrames || []
-
-    if (pausedStack.length) {
-      const [topFrame] = pausedStack
-      const scopesResp = await session.customRequest('scopes', { frameId: topFrame.id })
-      for (const scope of scopesResp.scopes || []) {
-        const varsResp = await session.customRequest('variables', {
-          variablesReference: scope.variablesReference,
-        })
-        topFrameVariables.push({
-          scopeName: scope.name,
-          variables: (await varsResp).variables,
-        })
-      }
-    }
-  }
-  catch (e) {
-    if (String(e).includes('Thread is not paused')) {
-      debug('gatherPausedState: Thread is not paused, paused state is not available.')
-      // Set a default value for pausedStack since no stack trace is available.
-      pausedStack = []
-    }
-    else {
-      error(`Failed to gather paused stack or variables: ${String(e)}`)
-    }
-  }
-
-  return { breakpoints, pausedStack, topFrameVariables }
-}
-
-/**
  * Marks lines in the structured code where breakpoints exist.
  */
 export function markBreakpointsInCode(
