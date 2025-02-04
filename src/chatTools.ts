@@ -1,4 +1,6 @@
 import process from 'node:process'
+import fs from 'node:fs'
+import path from 'node:path'
 import { OpenAI } from 'openai'
 import type { ChatCompletionMessageParam, ChatCompletionTool } from './types'
 
@@ -69,7 +71,17 @@ export const debugFunctions: ChatCompletionTool[] = [
   },
 ]
 
+const promptCacheFile = path.join(process.cwd(), '.llm-debugger-prompt-cache.json')
+if (fs.existsSync(promptCacheFile)) {
+  fs.writeFileSync(promptCacheFile, JSON.stringify({}, null, 2))
+}
+
 export async function callLlm(prompt: string) {
+  const cache = JSON.parse(fs.readFileSync(promptCacheFile, 'utf8'))
+  if (cache[prompt]) {
+    return cache[prompt]
+  }
+
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
   const userMessage: ChatCompletionMessageParam = {
@@ -83,6 +95,9 @@ export async function callLlm(prompt: string) {
     messages: [systemMessage, userMessage],
     tool_choice: 'auto',
   })
+
+  cache[prompt] = completion.choices[0].message.content
+  fs.writeFileSync(promptCacheFile, JSON.stringify(cache, null, 2))
 
   return completion
 }
