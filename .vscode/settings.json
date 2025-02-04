@@ -45,5 +45,10 @@
     "json",
     "jsonc",
     "yaml"
-  ]
+  ],
+  "files.exclude": {
+    "node_modules": true,
+    "package": true,
+    "dist": true
+  }
 }
