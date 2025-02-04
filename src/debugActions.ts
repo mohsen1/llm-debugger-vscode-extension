@@ -1,11 +1,11 @@
 import * as path from 'node:path'
 import type { ChatCompletion } from 'openai/resources'
 import * as vscode from 'vscode'
-
-const outputChannel = vscode.window.createOutputChannel('LLM Debugger')
+import { debug, error, info, warn } from './log'
 
 export async function setBreakpoint(functionArgsString: string) {
   try {
+    debug(`Setting breakpoint: ${functionArgsString}`)
     const { file, line } = JSON.parse(functionArgsString)
     let fullPath = file
     if (!path.isAbsolute(file) && vscode.workspace.workspaceFolders?.length) {
@@ -19,16 +19,17 @@ export async function setBreakpoint(functionArgsString: string) {
     const breakpoint = new vscode.SourceBreakpoint(location, true)
 
     vscode.debug.addBreakpoints([breakpoint])
-    outputChannel.appendLine(`Breakpoint set at ${file}:${line}`)
-    vscode.window.showInformationMessage(`Breakpoint set at ${file}:${line}`)
+    info(`Breakpoint set at ${file}:${line}`)
+    // vscode.window.showInformationMessage(`Breakpoint set at ${file}:${line}`)
   }
   catch (err) {
-    outputChannel.appendLine(`Failed to set breakpoint: ${String(err)}`)
+    error(`Failed to set breakpoint: ${String(err)}`)
     vscode.window.showErrorMessage(`Failed to set breakpoint: ${String(err)}`)
   }
 }
 
 export async function removeBreakpoint(functionArgsString: string) {
+  debug(`Removing breakpoint: ${functionArgsString}`)
   try {
     const { file, line } = JSON.parse(functionArgsString)
     const allBreakpoints = vscode.debug.breakpoints
@@ -45,77 +46,79 @@ export async function removeBreakpoint(functionArgsString: string) {
 
     if (toRemove.length) {
       vscode.debug.removeBreakpoints(toRemove)
-      outputChannel.appendLine(`Removed ${toRemove.length} breakpoint(s) at ${file}:${line}`)
+      info(`Removed ${toRemove.length} breakpoint(s) at ${file}:${line}`)
       vscode.window.showInformationMessage(`Removed breakpoint at ${file}:${line}`)
     }
     else {
-      outputChannel.appendLine(`No breakpoint found at ${file}:${line} to remove.`)
+      warn(`No breakpoint found at ${file}:${line} to remove.`)
       vscode.window.showWarningMessage(`No breakpoint found at ${file}:${line} to remove.`)
     }
   }
   catch (err) {
-    outputChannel.appendLine(`Failed to remove breakpoint: ${String(err)}`)
+    error(`Failed to remove breakpoint: ${String(err)}`)
     vscode.window.showErrorMessage(`Failed to remove breakpoint: ${String(err)}`)
   }
 }
 
 export async function stepOver() {
+  debug('Stepping over the current line.')
   const session = vscode.debug.activeDebugSession
   if (!session) {
-    outputChannel.appendLine('Cannot stepOver. No active debug session.')
+    debug('Cannot stepOver. No active debug session.')
     return
   }
   try {
     await session.customRequest('next')
-    outputChannel.appendLine('Stepped over the current line.')
+    info('Stepped over the current line.')
   }
   catch (err) {
-    outputChannel.appendLine(`Failed to step over: ${String(err)}`)
+    error(`Failed to step over: ${String(err)}`)
   }
 }
 
 export async function stepIn() {
+  debug('Stepping into the current function call.')
   const session = vscode.debug.activeDebugSession
   if (!session) {
-    outputChannel.appendLine('Cannot stepIn. No active debug session.')
+    debug('Cannot stepIn. No active debug session.')
     return
   }
   try {
     await session.customRequest('stepIn')
-    outputChannel.appendLine('Stepped into the current function call.')
+    info('Stepped into the current function call.')
   }
   catch (err) {
-    outputChannel.appendLine(`Failed to step in: ${String(err)}`)
+    error(`Failed to step in: ${String(err)}`)
   }
 }
 
 export async function stepOut() {
   const session = vscode.debug.activeDebugSession
   if (!session) {
-    outputChannel.appendLine('Cannot stepOut. No active debug session.')
+    debug('Cannot stepOut. No active debug session.')
     return
   }
   try {
     await session.customRequest('stepOut')
-    outputChannel.appendLine('Stepped out of the current function call.')
+    info('Stepped out of the current function call.')
   }
   catch (err) {
-    outputChannel.appendLine(`Failed to step out: ${String(err)}`)
+    error(`Failed to step out: ${String(err)}`)
   }
 }
 
 export async function continueExec() {
   const session = vscode.debug.activeDebugSession
   if (!session) {
-    outputChannel.appendLine('Cannot continue. No active debug session.')
+    debug('Cannot continue. No active debug session.')
     return
   }
   try {
     await session.customRequest('continue')
-    outputChannel.appendLine('Continued execution.')
+    info('Continued execution.')
   }
   catch (err) {
-    outputChannel.appendLine(`Failed to continue: ${String(err)}`)
+    error(`Failed to continue: ${String(err)}`)
   }
 }
 
@@ -124,11 +127,16 @@ export async function handleLlmFunctionCall(completion: ChatCompletion, {
 }: {
   callAllFunctions?: boolean
 } = {}) {
-  const choice = completion.choices[0]
+  const choice = completion?.choices?.[0]
+  if (!choice) {
+    debug(`No choice found in completion. ${JSON.stringify(completion)}`)
+    return
+  }
   const finishReason = choice.finish_reason
 
   for (const toolCall of choice.message?.tool_calls || []) {
     const { name, arguments: argsStr } = toolCall.function
+    debug(`Handling tool call: ${name} ${argsStr}`)
     switch (name) {
       case 'setBreakpoint':
         await setBreakpoint(argsStr)
@@ -154,7 +162,7 @@ export async function handleLlmFunctionCall(completion: ChatCompletion, {
   }
 
   if (finishReason === 'stop') {
-    outputChannel.appendLine('LLM indicated to stop debugging actions.')
+    debug('LLM indicated to stop debugging actions.')
   }
 }
 
@@ -195,7 +203,7 @@ export async function gatherPausedState(session: vscode.DebugSession) {
     }
   }
   catch (e) {
-    outputChannel.appendLine(`Failed to gather paused stack or variables: ${String(e)}`)
+    error(`Failed to gather paused stack or variables: ${String(e)}`)
   }
 
   return { breakpoints, pausedStack, topFrameVariables }

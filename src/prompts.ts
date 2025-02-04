@@ -1,4 +1,4 @@
-import type { ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam } from 'openai/resources'
+import type { ChatCompletionSystemMessageParam } from 'openai/resources'
 import type { PausedState, StructuredCode } from './types'
 
 export const systemMessage: ChatCompletionSystemMessageParam = {

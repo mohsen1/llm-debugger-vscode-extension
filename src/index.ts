@@ -8,75 +8,65 @@ import {
 } from './debugActions'
 import { getInitialBreakpointsMessage, getPausedMessage } from './prompts'
 import type { StructuredCode } from './types'
-
-const outputChannel = vscode.window.createOutputChannel('LLM Debugger')
+import * as log from './log'
 
 // Store the structured code so we can annotate breakpoints on it whenever we pause
-let structuredCode: StructuredCode[] = []
-
+const structuredCode: StructuredCode[] = []
 vscode.debug.registerDebugAdapterTrackerFactory('pwa-node', {
   createDebugAdapterTracker(session: vscode.DebugSession) {
-    outputChannel.appendLine(`createDebugAdapterTracker: ${session.id}`)
+    log.debug(`createDebugAdapterTracker for session: ${session.id}`)
     return {
-      onExit() {
-        outputChannel.appendLine('onExit')
-      },
+      async onWillStartSession() {
+        // pause the session
+        const structuredCode = await gatherWorkspaceCode()
+        log.clear()
+        log.debug('Calling LLM for initial breakpoints.')
+        log.show()
 
-      onWillStartSession() {
-        outputChannel.appendLine('onWillStartSession')
-      },
+        // Clearn all breakpoints (TODO: this should not be in the final implementation)
+        await vscode.debug.removeBreakpoints(
+          vscode.debug.breakpoints.filter(breakpoint => breakpoint.enabled),
+        )
 
-      onWillStopSession() {
-        outputChannel.appendLine('onWillStopSession')
-      },
+        // Ask LLM for any initial breakpoints before launching
+        session.customRequest('pause')
+        const initialResponse = await callLlm(getInitialBreakpointsMessage(structuredCode))
+        await handleLlmFunctionCall(initialResponse)
+        log.debug('Resuming session.')
+        session.customRequest('continue')
 
-      onDidReceiveMessage(message: any) {
-        outputChannel.appendLine(`onDidReceiveMessage: ${message.type} ${message.event}`)
-      },
-
-      onError(error) {
-        outputChannel.appendLine(`onError: ${error}`)
-      },
-      onWillReceiveMessage(message) {
-        outputChannel.appendLine(`onWillReceiveMessage: ${message.type} ${message.event}`)
-      },
-      onDidSendMessage: async (message) => {
-        outputChannel.appendLine(`onDidSendMessage: ${message.type} ${message.event}`)
-        // We only care about DAP events
-        if (message.type !== 'event')
-          return
-
-        // "stopped" is the standard DAP event fired when execution is paused
-        if (message.event === 'stopped') {
-          outputChannel.appendLine('Debugger has paused ("stopped" event).')
-
-          // Gather paused state (stack, variables, breakpoints, etc.)
-          const pausedState = await gatherPausedState(session)
-          markBreakpointsInCode(structuredCode, pausedState.breakpoints)
-
-          // Call the LLM with the updated state
-          const pausedResponse = await callLlm(getPausedMessage(structuredCode, pausedState))
-
-          await handleLlmFunctionCall(pausedResponse, { callAllFunctions: true })
-        }
+        await debugLoop(session)
       },
     }
   },
 })
+
+async function debugLoop(session: vscode.DebugSession) {
+  log.debug('Starting debug loop.')
+  while (
+    // TODO: while session is active session not just any active session
+    vscode.debug.activeDebugSession?.id
+  ) {
+    // Gather paused state (stack, variables, breakpoints, etc.)
+    const pausedState = await gatherPausedState(session)
+    markBreakpointsInCode(structuredCode, pausedState.breakpoints)
+
+    log.debug('Calling LLM with paused state.')
+    // Call the LLM with the updated state
+    const pausedResponse = await callLlm(getPausedMessage(structuredCode, pausedState))
+
+    log.debug('Handling LLM function call.')
+    log.debug(`Paused response: ${JSON.stringify(pausedResponse)}`)
+
+    await handleLlmFunctionCall(pausedResponse, { callAllFunctions: true })
+  }
+  log.debug('Debug loop ended.')
+}
+
 export function activate(context: vscode.ExtensionContext) {
-  outputChannel.appendLine('LLM Debugger activated.')
+  log.debug('LLM Debugger activated.')
 
   const command = vscode.commands.registerCommand('llm-debugger.startLLMDebug', async () => {
-    // Gather and store code from the workspace
-    structuredCode = await gatherWorkspaceCode()
-    outputChannel.appendLine('Calling LLM for initial breakpoints.')
-    outputChannel.show()
-
-    // Ask LLM for any initial breakpoints before launching
-    const initialResponse = await callLlm(getInitialBreakpointsMessage(structuredCode))
-
-    await handleLlmFunctionCall(initialResponse)
-
     // Now launch the actual * debug session
     const started = await vscode.debug.startDebugging(undefined, {
       type: 'pwa-node',
@@ -88,25 +78,25 @@ export function activate(context: vscode.ExtensionContext) {
     })
 
     if (!started) {
-      outputChannel.appendLine('Failed to start debug session.')
+      log.error('Failed to start debug session.')
       return
     }
 
-    outputChannel.appendLine('Debug session started.')
-    outputChannel.show()
+    log.debug('Debug session started.')
+    log.show()
 
     const session = vscode.debug.activeDebugSession
     if (!session)
-      outputChannel.appendLine('No active debug session found.')
+      log.error('No active debug session found.')
 
     vscode.debug.onDidReceiveDebugSessionCustomEvent((event) => {
-      outputChannel.appendLine(`onDidReceiveMessage: ${JSON.stringify(event)}`)
+      log.debug(`onDidReceiveMessage: ${JSON.stringify(event)}`)
     })
 
     // If the session ends, we can do any cleanup
     vscode.debug.onDidTerminateDebugSession((terminated) => {
       if (terminated.id === session?.id) {
-        outputChannel.appendLine('Debug session terminated.')
+        log.debug('Debug session terminated.')
       }
     })
   })
@@ -115,5 +105,5 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  outputChannel.appendLine('LLM Debugger deactivated.')
+  log.debug('LLM Debugger deactivated.')
 }
