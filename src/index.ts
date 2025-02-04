@@ -14,7 +14,7 @@ const outputChannel = vscode.window.createOutputChannel('LLM Debugger')
 // Store the structured code so we can annotate breakpoints on it whenever we pause
 let structuredCode: StructuredCode[] = []
 
-vscode.debug.registerDebugAdapterTrackerFactory('node', {
+vscode.debug.registerDebugAdapterTrackerFactory('pwa-node', {
   createDebugAdapterTracker(session: vscode.DebugSession) {
     outputChannel.appendLine(`createDebugAdapterTracker: ${session.id}`)
     return {
@@ -79,7 +79,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Now launch the actual * debug session
     const started = await vscode.debug.startDebugging(undefined, {
-      type: 'node',
+      type: 'pwa-node',
       request: 'launch',
       name: 'LLM Debugger',
       // eslint-disable-next-line no-template-curly-in-string

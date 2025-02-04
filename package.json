@@ -46,12 +46,12 @@
   },
   "activationEvents": [
     "onDebugResolve:node",
-    "onDebugAdapterProtocolTracker:node"
+    "onDebugAdapterProtocolTracker:pwa-node"
   ],
   "contributes": {
     "debuggers": [
       {
-        "type": "node"
+        "type": "pwa-node"
       }
     ],
     "commands": [
