@@ -1,4 +1,5 @@
 import * as path from 'node:path'
+import type { ChatCompletion } from 'openai/resources'
 import * as vscode from 'vscode'
 
 const outputChannel = vscode.window.createOutputChannel('LLM Debugger')
@@ -115,6 +116,45 @@ export async function continueExec() {
   }
   catch (err) {
     outputChannel.appendLine(`Failed to continue: ${String(err)}`)
+  }
+}
+
+export async function handleLlmFunctionCall(completion: ChatCompletion, {
+  callAllFunctions = false,
+}: {
+  callAllFunctions?: boolean
+} = {}) {
+  const choice = completion.choices[0]
+  const finishReason = choice.finish_reason
+
+  for (const toolCall of choice.message?.tool_calls || []) {
+    const { name, arguments: argsStr } = toolCall.function
+    switch (name) {
+      case 'setBreakpoint':
+        await setBreakpoint(argsStr)
+        break
+      case 'removeBreakpoint':
+        await removeBreakpoint(argsStr)
+        break
+      case 'stepOver':
+        await stepOver()
+        break
+      case 'stepIn':
+        await stepIn()
+        break
+      case 'stepOut':
+        await stepOut()
+        break
+      case 'continueExec':
+        await continueExec()
+        break
+    }
+    if (!callAllFunctions)
+      break
+  }
+
+  if (finishReason === 'stop') {
+    outputChannel.appendLine('LLM indicated to stop debugging actions.')
   }
 }
 

@@ -45,14 +45,19 @@
     "vscode": "^1.96.0"
   },
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:llm-debugger.startLLMDebug"
+    "onDebugResolve:node",
+    "onDebugAdapterProtocolTracker:node"
   ],
   "contributes": {
+    "debuggers": [
+      {
+        "type": "node"
+      }
+    ],
     "commands": [
       {
         "command": "llm-debugger.startLLMDebug",
-        "title": "Start LLM Debug"
+        "title": "Start LLM Debug Session"
       }
     ],
     "configuration": {
