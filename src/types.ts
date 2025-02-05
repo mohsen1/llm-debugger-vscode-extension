@@ -11,8 +11,8 @@ export interface StructuredCode {
 
 export interface PausedState {
   breakpoints: Array<{ file: string, line: number }>
-  pausedStack: any
-  topFrameVariables: any[]
+  pausedStack: unknown
+  topFrameVariables: unknown[]
 }
 
 export type { ChatCompletionMessageParam, ChatCompletionTool }

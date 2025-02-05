@@ -1,4 +1,5 @@
-/* eslint-disable no-console */
+/* eslint-disable no-undef */
+ 
 import { appendArray } from './array.js'
 
 console.log('should append the given numbers to the array')

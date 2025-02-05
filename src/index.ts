@@ -60,8 +60,8 @@ class DebugLoopController {
   }
 }
 
-process.on('uncaughtException', (error) => {
-  log.error('Uncaught exception:', error)
+process.on('uncaughtException', (error: Error) => {
+  log.error('Uncaught exception:', String(error))
 })
 
 export function activate(context: vscode.ExtensionContext) {
@@ -92,7 +92,7 @@ export function activate(context: vscode.ExtensionContext) {
             log.error('createDebugAdapterTracker', session.id, String(error))
           },
 
-          onDidSendMessage: async (message: any) => {
+          onDidSendMessage: async (message: { event: string, body: { threadId: number, reason: string } }) => {
             log.debug('onDidSendMessage', session.id, JSON.stringify(message))
             if (message.event === 'stopped') {
               const { threadId, reason } = message.body
@@ -110,13 +110,13 @@ export function activate(context: vscode.ExtensionContext) {
       type: 'pwa-node',
       request: 'launch',
       name: 'LLM Debugger',
-      // eslint-disable-next-line no-template-curly-in-string
+       
       program: '${workspaceFolder}/array.test.js',
       env: { NODE_ENV: 'test' },
     })
 
     // If the session ends, we can do any cleanup
-    vscode.debug.onDidTerminateDebugSession((_) => {
+    vscode.debug.onDidTerminateDebugSession(() => {
       disposable.dispose()
       debugLoopController.stop()
     })

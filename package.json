@@ -57,7 +57,6 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "prepare": "nr update",
     "update": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
     "vscode:prepublish": "tsc",
@@ -65,7 +64,7 @@
     "pack": "vsce package --no-dependencies",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp && nr publish"
+    "release": "bumpp && pnpm publish"
   },
   "dependencies": {
     "@vscode/debugadapter": "^1.68.0",
@@ -73,13 +72,12 @@
     "openai": "^4.82.0"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^2.26.0",
-    "@antfu/ni": "^0.22.4",
     "@types/node": "^22.4.1",
     "@types/vscode": "1.96.0",
     "@vscode/vsce": "^3.0.0",
     "bumpp": "^9.5.1",
-    "eslint": "^9.9.0",
+    "eslint": "^9.19.0",
+    "typescript-eslint": "^8.23.0",
     "reactive-vscode": "^0.2.0",
     "typescript": "^5.5.4",
     "vite": "^5.4.1",
