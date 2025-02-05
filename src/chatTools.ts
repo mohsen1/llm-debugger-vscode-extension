@@ -5,6 +5,7 @@ import path from "node:path";
 import { OpenAI } from "openai";
 import type { ChatCompletion } from "openai/resources/chat/completions";
 import type { ChatCompletionMessageParam, ChatCompletionTool } from "./types";
+import log from "./log";
 
 export const initialBreakPointsSystemMessage: ChatCompletionMessageParam = {
   role: "system" as const,
@@ -76,7 +77,7 @@ export const debugFunctions: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "continueExec",
+      name: "continue",
       description: "Continue execution in the debugger.",
       parameters: { type: "object", properties: {} },
     },
@@ -119,17 +120,15 @@ export async function callLlm(
     messages.push({ role: "user", content: promptOrMessages });
   }
   
-
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const withTools = functions && functions.length > 0;
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
-    tools: functions,
+    tools: withTools ? functions : undefined,
     messages, 
-    tool_choice: functions && functions.length > 0 ? "required" : "auto",
+    tool_choice: withTools ? "required" : undefined,
     max_tokens: 1000,
   });
-
-
 
   const promptCacheFile = path.join(
     os.homedir(),

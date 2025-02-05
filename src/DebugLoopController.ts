@@ -1,0 +1,360 @@
+import * as path from "node:path";
+import type { ChatCompletion } from "openai/resources";
+import * as vscode from "vscode";
+import {
+    breakpointFunctions,
+    callLlm,
+    ChatWithHistory,
+    debugFunctions,
+    debugLoopSystemMessage,
+} from "./chatTools";
+import log from "./log";
+import { getInitialBreakpointsMessage, getPausedMessage } from "./prompts";
+import { gatherPausedState } from "./state";
+import { StructuredCode } from "./types";
+import { EventEmitter } from "node:events";
+
+/**
+ * This controller waits for "stopped" events to retrieve paused state.
+ * Instead of forcing "pause", we only call gatherPausedState after the debugger
+ * actually stops. This avoids the 'Thread is not paused' error.
+ */
+export class DebugLoopController extends EventEmitter {
+    private live = false;
+    private finishing = false;
+    private session: vscode.DebugSession | null = null;
+    private chatWithHistory = new ChatWithHistory(debugLoopSystemMessage, [
+        ...breakpointFunctions,
+        ...debugFunctions,
+    ]);
+
+    private structuredCode: StructuredCode[] = [];
+
+    setCode(code: StructuredCode[]) {
+        this.structuredCode = code;
+    }
+
+    /**
+     * Called whenever a "stopped" event occurs. We gather paused state,
+     * send it to the LLM, and handle the function calls it returns.
+     */
+    async handleThreadStopped(session: vscode.DebugSession) {
+        if (!this.live) return;
+        if (this.finishing) return;
+        if (!this.session) {
+            this.session = session;
+            await this.loop();
+        }
+        this.emit("threadStopped", session);
+    }
+
+    waitForThreadStopped() {
+        return new Promise<void>((resolve) => {
+            this.on("threadStopped", resolve);
+        });
+    }
+
+    async setInitialBreakpoints() {
+        log.info("Setting initial breakpoints...");
+        const response = await callLlm(
+            getInitialBreakpointsMessage(this.structuredCode),
+            breakpointFunctions,
+        );
+        const [choice] = response.choices;
+        const content = choice?.message?.content;
+        if (content) {
+            log.ai(content);
+        }
+    }
+
+    reset() {
+        this.session = null;
+        this.chatWithHistory.clearHistory();
+        this.finishing = false;
+        this.live = false;
+    }
+
+    async loop() {
+        log.debug("loop");
+        if (!this.session) return;
+        if (!this.live) return;
+
+        const pausedState = await gatherPausedState(this.session);
+
+        if (this.finishing) return;
+        if (!this.live) return;
+
+        log.ai("Thinking...");
+        const llmResponse = await this.chatWithHistory.ask(
+            getPausedMessage(this.structuredCode, pausedState),
+        );
+
+        if (this.finishing) return;
+        if (!this.live) return;
+
+        const [choice] = llmResponse.choices;
+        const content = choice?.message?.content;
+        if (content) {
+            log.ai(content);
+        }
+
+        await this.handleLlmFunctionCall(llmResponse);
+
+        if (this.finishing) return;
+        if (!this.live) return;
+
+        await this.loop();
+    }
+
+    async start() {
+        this.live = true;
+    }
+
+    async finish() {
+        if (this.finishing) return;
+        this.finishing = true;
+
+        log.ai(
+            "Debug session finished. Providing code fix and explanation...",
+        );
+
+        // Provide final fix explanation if wanted...
+        const response = await this.chatWithHistory.ask(
+            "Debug session finished. Provide a code fix and explain your reasoning.",
+            { withFunctions: false },
+        );
+        const [choice] = response.choices;
+        const content = choice?.message?.content;
+        if (content) {
+            log.ai(content);
+        }
+
+        this.stop();
+    }
+
+    stop() {
+        this.live = false;
+    }
+
+    async setBreakpoint(functionArgsString: string) {
+        try {
+            const { file, line } = JSON.parse(functionArgsString);
+            let fullPath = file;
+            if (
+                !path.isAbsolute(file) &&
+                vscode.workspace.workspaceFolders?.length
+            ) {
+                const workspaceRoot =
+                    vscode.workspace.workspaceFolders[0].uri.fsPath;
+                fullPath = path.join(workspaceRoot, file);
+            }
+
+            const uri = vscode.Uri.file(fullPath);
+            const position = new vscode.Position(line - 1, 0);
+            const location = new vscode.Location(uri, position);
+            const breakpoint = new vscode.SourceBreakpoint(location, true);
+
+            vscode.debug.addBreakpoints([breakpoint]);
+        } catch (err) {
+            log.error(`Failed to set breakpoint: ${String(err)}`);
+            vscode.window.showErrorMessage(
+                `Failed to set breakpoint: ${String(err)}`,
+            );
+        }
+    }
+
+    async removeBreakpoint(functionArgsString: string) {
+        log.debug(`Removing breakpoint: ${functionArgsString}`);
+        try {
+            const { file, line } = JSON.parse(functionArgsString);
+            const allBreakpoints = vscode.debug.breakpoints;
+            const toRemove: vscode.Breakpoint[] = [];
+
+            for (const bp of allBreakpoints) {
+                if (bp instanceof vscode.SourceBreakpoint) {
+                    const thisFile = bp.location.uri.fsPath;
+                    const thisLine = bp.location.range.start.line + 1;
+                    if (
+                        (thisFile === file || thisFile.endsWith(file)) &&
+                        thisLine === line
+                    ) {
+                        toRemove.push(bp);
+                    }
+                }
+            }
+
+            if (toRemove.length) {
+                vscode.debug.removeBreakpoints(toRemove);
+                log.info(
+                    `Removed ${toRemove.length} breakpoint(s) at ${file}:${line}`,
+                );
+                vscode.window.showInformationMessage(
+                    `Removed breakpoint at ${file}:${line}`,
+                );
+            } else {
+                log.warn(`No breakpoint found at ${file}:${line} to remove.`);
+                vscode.window.showWarningMessage(
+                    `No breakpoint found at ${file}:${line} to remove.`,
+                );
+            }
+        } catch (err) {
+            log.error(`Failed to remove breakpoint: ${String(err)}`);
+            vscode.window.showErrorMessage(
+                `Failed to remove breakpoint: ${String(err)}`,
+            );
+        }
+    }
+
+    async next() {
+        const session = vscode.debug.activeDebugSession;
+        if (!session) {
+            log.debug("Cannot run command 'next'. No active debug session.");
+            return;
+        }
+        try {
+            // Get the current thread ID - typically the first thread in a JavaScript debug session
+            const threads = await session.customRequest("threads");
+            const threadId = threads.threads[0]?.id;
+
+            if (threadId === undefined) {
+                log.debug("Cannot run command 'next'. No active thread found.");
+                return;
+            }
+
+            await Promise.all([
+                session.customRequest("next", { threadId }),
+                this.waitForThreadStopped(),
+            ]);
+        } catch (err) {
+            log.error(`Failed to run command 'next': ${String(err)}`);
+        }
+    }
+
+    async stepIn() {
+        const session = vscode.debug.activeDebugSession;
+        if (!session) {
+            log.debug("Cannot stepIn. No active debug session.");
+            return;
+        }
+        try {
+            // Get the current thread ID - typically the first thread in a JavaScript debug session
+            const threads = await session.customRequest("threads");
+            const threadId = threads.threads[0]?.id;
+
+            if (threadId === undefined) {
+                log.debug("Cannot stepIn. No active thread found.");
+                return;
+            }
+
+            await Promise.all([
+                session.customRequest("stepIn", { threadId }),
+                this.waitForThreadStopped(),
+            ]);
+        } catch (err) {
+            log.error(`Failed to step in: ${String(err)}`);
+        }
+    }
+
+    async stepOut() {
+        const session = vscode.debug.activeDebugSession;
+        if (!session) {
+            log.debug("Cannot run command 'stepOut'. No active debug session.");
+            return;
+        }
+        try {
+            // Get the current thread ID - typically the first thread in a JavaScript debug session
+            const threads = await session.customRequest("threads");
+            const threadId = threads.threads[0]?.id;
+
+            if (threadId === undefined) {
+                log.debug(
+                    "Cannot run command 'stepOut'. No active thread found.",
+                );
+                return;
+            }
+
+            await Promise.all([
+                session.customRequest("stepOut", { threadId }),
+                this.waitForThreadStopped(),
+            ]);
+            log.info("Stepped out of the current function call.");
+        } catch (err) {
+            log.error(`Failed to run command 'stepOut': ${String(err)}`);
+        }
+    }
+
+    async continueExecution() {
+        const session = vscode.debug.activeDebugSession;
+        if (!session) {
+            log.debug(
+                "Cannot run command 'continue'. No active debug session.",
+            );
+            return;
+        }
+        try {
+            // Typically the first JS thread:
+            const threads = await session.customRequest("threads");
+            const threadId = threads.threads[0]?.id;
+            if (threadId === undefined) {
+                log.debug(
+                    "Cannot run command 'continue'. No active thread found.",
+                );
+                return;
+            }
+            // Kick off "continue":
+            await Promise.all([
+                session.customRequest("continue", { threadId }),
+                this.waitForThreadStopped(),
+            ]);
+        } catch (err) {
+            log.error(`Failed to run command 'continue': ${String(err)}`);
+        }
+    }
+
+    async handleLlmFunctionCall(completion: ChatCompletion) {
+        const choice = completion?.choices?.[0];
+        if (!choice) {
+            log.debug(
+                `No choice found in completion. ${JSON.stringify(completion)}`,
+            );
+            return { shouldContinue: true };
+        }
+
+        const hasActiveBreakpoints = vscode.debug.breakpoints.some((bp) =>
+            bp.enabled
+        );
+
+        for (const toolCall of choice.message?.tool_calls || []) {
+            const { name, arguments: argsStr } = toolCall.function;
+            log.fn(`${name}(${argsStr || ""})`);
+
+            switch (name) {
+                case "setBreakpoint":
+                    await this.setBreakpoint(argsStr);
+                    break;
+                case "removeBreakpoint":
+                    await this.removeBreakpoint(argsStr);
+                    break;
+                case "next":
+                    await this.next();
+                    break;
+                case "stepIn":
+                    await this.stepIn();
+                    break;
+                case "stepOut":
+                    await this.stepOut();
+                    break;
+                case "continue": {
+                    if (hasActiveBreakpoints) {
+                        await this.continueExecution();
+                    } else {
+                        log.debug("Cannot continue. No active breakpoints.");
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    }
+}

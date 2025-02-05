@@ -38,8 +38,8 @@ export function getPausedMessage(
   message.push(
     "# Instructions:",
     "Debugger is in paused state",
-    "Choose next action by calling setBreakpoint, removeBreakpoint, next, stepIn, stepOut, or continueExec.",
-    "Always make sure there are breakpoints set before calling continueExec.",
+    "Choose next action by calling setBreakpoint, removeBreakpoint, next, stepIn, stepOut, or continue.",
+    "Always make sure there are breakpoints set before calling continue.",
     "Once you understood the problem, instead of calling any tools, respond with a code fix and explain your reasoning.",
   );
 
