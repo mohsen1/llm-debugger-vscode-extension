@@ -1,5 +1,5 @@
 import type { ChatCompletionSystemMessageParam } from "openai/resources";
-import type { PausedState, StructuredCode } from "./types";
+import type {  StructuredCode } from "./types";
 
 export const systemMessage: ChatCompletionSystemMessageParam = {
   role: "system",
@@ -20,42 +20,34 @@ export function getInitialBreakpointsMessage(
 
 export function getPausedMessage(
   structuredCode: StructuredCode[],
-  pausedState: PausedState | null,
+  pausedState: unknown
 ): string {
   const message = [
-    "Code:",
+    "# Code:",
     serializeStructuredCode(structuredCode),
     "",
   ];
-  
+
   if (pausedState) {
     message.push(
-      "Current Debug State:",
-      "Breakpoints:",
-      serializeBreakpoints(pausedState.breakpoints),
-      "",
-      "Stack Trace:",
-      JSON.stringify(pausedState.pausedStack, null, 2),
-      "",
-      "Variables:",
-      JSON.stringify(pausedState.topFrameVariables, null, 2),
-      "",
+      "# Current Debug State:",
+      JSON.stringify(pausedState)
     );
   }
 
   message.push(
+    "# Instructions:",
     "Debugger is in paused state",
     "Choose next action by calling setBreakpoint, removeBreakpoint, next, stepIn, stepOut, or continueExec.",
+    "Always make sure there are breakpoints set before calling continueExec.",
+    "Once you understood the problem, instead of calling any tools, respond with a code fix and explain your reasoning.",
   );
 
   return message.join("\n");
 }
 
-function serializeBreakpoints(breakpoints: PausedState["breakpoints"]) {
-  return breakpoints.map(({ file, line }) => `${file}:${line}`).join(", ");
-}
 
-function serializeStructuredCode(structuredCode: StructuredCode[]) {
+export function serializeStructuredCode(structuredCode: StructuredCode[]) {
   const serialized = structuredCode
     .map(
       ({ filePath, lines }) =>

@@ -2,6 +2,7 @@ import * as path from "node:path";
 import type { ChatCompletion } from "openai/resources";
 import * as vscode from "vscode";
 import log from "./log";
+import { StructuredCode } from "./types";
 
 export async function setBreakpoint(functionArgsString: string) {
   try {
@@ -144,7 +145,6 @@ export async function continueExec() {
     }
 
     await session.customRequest("continue", { threadId });
-    log.info("Continued execution.");
   } catch (err) {
     log.error(`Failed to run command 'continue': ${String(err)}`);
   }
@@ -186,19 +186,23 @@ export async function handleLlmFunctionCall(completion: ChatCompletion) {
   }
 }
 
+function getBreakpointInfo(breakpoint: vscode.Breakpoint): { filePath?: string; line?: number } {
+  if (breakpoint instanceof vscode.SourceBreakpoint) {
+    const { uri, range } = breakpoint.location;  // range is zero-based
+    const filePath = uri.fsPath;                 // or uri.toString() if you want the URI
+    const line = range.start.line;               // zero-based line index
+    return { filePath, line };
+  } else {
+    // FunctionBreakpoint, no file/line info
+    return {};
+  }
+}
 /**
  * Marks lines in the structured code where breakpoints exist.
  */
 export function markBreakpointsInCode(
-  structuredCode: Array<{
-    filePath: string;
-    lines: Array<{
-      lineNumber: number;
-      text: string;
-      hasBreakpoint?: boolean;
-    }>;
-  }>,
-  breakpoints: Array<{ file: string; line: number }>,
+  structuredCode: StructuredCode[],
+  breakpoints: vscode.Breakpoint[],
 ) {
   for (const fileObj of structuredCode) {
     for (const lineObj of fileObj.lines) {
@@ -206,9 +210,11 @@ export function markBreakpointsInCode(
     }
   }
   for (const bp of breakpoints) {
-    const fileObj = structuredCode.find((sc) => sc.filePath === bp.file);
+    const { filePath, line } = getBreakpointInfo(bp);
+    if (!filePath || !line) continue;
+    const fileObj = structuredCode.find((sc) => sc.filePath === filePath);
     if (!fileObj) continue;
-    const lineObj = fileObj.lines.find((l) => l.lineNumber === bp.line);
+    const lineObj = fileObj.lines.find((l) => l.lineNumber === line);
     if (lineObj) lineObj.hasBreakpoint = true;
   }
 }

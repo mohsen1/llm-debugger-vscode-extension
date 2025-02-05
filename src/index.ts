@@ -14,10 +14,10 @@ import log from "./log";
 import { gatherPausedState } from "./state";
 import { Thread } from "@vscode/debugadapter";
 
-const structuredCode: StructuredCode[] = [];
+let structuredCode: StructuredCode[] = [];
 
 async function setupInitialBreakpoints() {
-  const structuredCode = await gatherWorkspaceCode();
+  structuredCode = gatherWorkspaceCode();
 
   // Clear all breakpoints
   await vscode.debug.removeBreakpoints(
@@ -31,12 +31,9 @@ async function setupInitialBreakpoints() {
   await handleLlmFunctionCall(initialResponse);
 }
 
-async function getPausedState(session: vscode.DebugSession, threadId: number | undefined) {
-  if (!threadId) {
-    return null;
-  }
+async function getPausedState(session: vscode.DebugSession) {
   try {
-    const pausedState = await gatherPausedState(session, threadId);
+    const pausedState = await gatherPausedState(session);
     markBreakpointsInCode(structuredCode, pausedState.breakpoints);
     return pausedState;
   } catch (error) {
@@ -47,8 +44,8 @@ async function getPausedState(session: vscode.DebugSession, threadId: number | u
 
 class DebugLoopController {
   #live = false;
-  #currentThreadId: number | undefined;
-  #chatWithHistory = new ChatWithHistory(debugLoopSystemMessage, debugFunctions);
+  // #currentThreadId: number | undefined; // TODO: add threadId for multi-threaded debugging
+  #chatWithHistory = new ChatWithHistory(debugLoopSystemMessage, [...debugFunctions, ...breakpointFunctions]);
 
   async #loop(session: vscode.DebugSession) {
     if (!session || !this.#live) {
@@ -56,11 +53,16 @@ class DebugLoopController {
       return;
     };
     
-    const pausedState = await getPausedState(session, this.#currentThreadId);
-    log.ai("Asking...");
+    const pausedState = await getPausedState(session);
+    log.debug("Paused state", JSON.stringify(pausedState));
+
+    log.ai("Thinking...");
     const llmResponse = await this.#chatWithHistory.ask(
       getPausedMessage(structuredCode, pausedState)
     );
+    if (llmResponse.choices[0].message.content) {
+      log.ai(llmResponse.choices[0].message.content);
+    }
     await handleLlmFunctionCall(llmResponse);
 
     const activeDebugSession = vscode.debug.activeDebugSession;
@@ -73,12 +75,17 @@ class DebugLoopController {
     }
   }
 
+  finish() {
+    this.#live = false;
+    this.#chatWithHistory.ask("Debug session finished. Provide a code fix and explain your reasoning.", {withFunctions: false});
+  }
+
   stop() {
     this.#live = false;
   }
 
-  async start(session: vscode.DebugSession, threadId: number) {
-    this.#currentThreadId = threadId;
+  async start(session: vscode.DebugSession) {
+    // this.#currentThreadId = threadId;
     
     if (!this.#live) {
       this.#live = true;
@@ -104,7 +111,7 @@ class DebugAdapterTracker implements vscode.DebugAdapterTracker {
   }
 
   onWillStopSession(): void {
-    // log.debug("Debug session stopping");
+    debugLoopController.finish();
   }
 
   async onDidSendMessage(message: { type: string; command: string; body: unknown }): Promise<void> {
@@ -115,7 +122,7 @@ class DebugAdapterTracker implements vscode.DebugAdapterTracker {
       const body = message.body as { threads: Thread[] };
       const threads = body.threads || [];
       if (threads.length > 0) {
-        await debugLoopController.start(this.session, threads[0]?.id);
+        await debugLoopController.start(this.session);
       }
     }
   }

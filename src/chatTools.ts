@@ -96,10 +96,10 @@ export class ChatWithHistory {
     this.#messageHistory = [initialBreakPointsSystemMessage];
   }
 
-  ask(message: string) {
+  ask(message: string, {withFunctions = true} = {}) {
     // TODO: token count and shift items from the top of the history if necessary
     this.#messageHistory.push({ role: "user", content: message });
-    return callLlm(this.#messageHistory, this.#functions);
+    return callLlm(this.#messageHistory, withFunctions ? this.#functions : []);
   }
 }
 
@@ -125,9 +125,10 @@ export async function callLlm(
     model: "gpt-4o",
     tools: functions,
     messages, 
-    tool_choice: "required",
+    tool_choice: functions && functions.length > 0 ? "required" : "auto",
     max_tokens: 1000,
   });
+
 
 
   const promptCacheFile = path.join(

@@ -2,6 +2,7 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources";
+import { Breakpoint } from "vscode";
 
 export interface StructuredCode {
   filePath: string;
@@ -13,7 +14,7 @@ export interface StructuredCode {
 }
 
 export interface PausedState {
-  breakpoints: Array<{ file: string; line: number }>;
+  breakpoints: Breakpoint[];
   pausedStack: unknown;
   topFrameVariables: unknown[];
 }

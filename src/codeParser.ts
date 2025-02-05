@@ -2,14 +2,16 @@ import * as path from "node:path";
 import fs from "node:fs";
 import * as vscode from "vscode";
 import { StructuredCode } from "./types";
+import log from "./log";
 
 /**
  * Runs `yek` to retrieve a concatenated string of repo code, then splits it into structured lines per file.
  */
-export async function gatherWorkspaceCode(): Promise<StructuredCode[]> {
+export function gatherWorkspaceCode(): StructuredCode[] {
   const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!wsFolder) return [];
 
+  log.debug("Gathering workspace code", wsFolder);
   // Hardcoded for now
   return ["array.js", "array.test.js"].map((file) => ({
     filePath: path.join(wsFolder, file),

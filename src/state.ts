@@ -1,21 +1,89 @@
 import * as vscode from "vscode";
-import type {  StackFrame, Thread, Variable } from "@vscode/debugadapter";
-import log from "./log";
 
-interface SourceBreakpointInfo {
-  file: string;
-  line: number;
+
+async function getPusedStack(session: vscode.DebugSession) {
+  // 1) Get all threads
+  const threadsResponse = await session.customRequest("threads");
+  if (!threadsResponse?.threads) return;
+
+  // 2) Typically only one thread is actually "paused" on a stopped event,
+  //    but you may have multiple. You’d identify the stopped thread, e.g.:
+  //    (In some debug adapters, you get e.body.threadId as the paused thread.)
+  const pausedThreadId = threadsResponse.threads[0].id;
+
+  // 3) Request stack trace for the paused thread
+  const stackTraceResponse = await session.customRequest("stackTrace", {
+    threadId: pausedThreadId,
+    startFrame: 0,
+    levels: 20, // or however many frames you want
+  });
+
+  // 4) Do whatever you need with the stack frames
+  const frames = stackTraceResponse?.stackFrames || [];
+  return frames;
 }
 
-interface ScopeVariables {
-  scopeName: string;
-  variables: Variable[];
-}
+async function getTopFrameVariables(
+  activeSession: vscode.DebugSession,
+) {
+  try {
+    // 1) Get the active thread (this can be tricky if you have multiple threads)
+    //    You'll need the actual threadId; for demonstration let's assume it's 1.
+    //    If you need to find all threads, you can do:
+    //    const threads = await activeSession.customRequest('threads', {});
+    //    then pick a threadId from there.
 
-interface PausedState {
-  breakpoints: SourceBreakpointInfo[];
-  pausedStack: StackFrame[];
-  topFrameVariables: ScopeVariables[];
+    const threadId = 1;
+
+    // 2) Request the stack trace for the top frame
+    const stackTraceResponse = await activeSession.customRequest("stackTrace", {
+      threadId,
+      startFrame: 0,
+      levels: 1,
+    });
+
+    if (
+      !stackTraceResponse.stackFrames ||
+      stackTraceResponse.stackFrames.length === 0
+    ) {
+      vscode.window.showInformationMessage("No stack frames found.");
+      return;
+    }
+
+    // Take the first (top) frame
+    const topFrame = stackTraceResponse.stackFrames[0];
+    const frameId = topFrame.id;
+
+    // 3) Request scopes for this frame
+    const scopesResponse = await activeSession.customRequest("scopes", {
+      frameId,
+    });
+    if (!scopesResponse.scopes) {
+      vscode.window.showInformationMessage("No scopes found for top frame.");
+      return;
+    }
+
+    const variables: unknown[] = [];
+
+    // 4) For each scope, request the variables
+    for (const scope of scopesResponse.scopes) {
+      const variableRef = scope.variablesReference;
+      if (variableRef && variableRef > 0) {
+        const varsResponse = await activeSession.customRequest("variables", {
+          variablesReference: variableRef,
+        });
+        const vars = varsResponse.variables;
+        variables.push({
+          scopeName: scope.name,
+          variables: vars,
+        });
+      }
+    }
+
+    return variables;
+  } catch (err) {
+    console.error("Error retrieving variables:", err);
+  }
 }
 
 /**
@@ -27,67 +95,15 @@ interface PausedState {
  */
 export async function gatherPausedState(
   session: vscode.DebugSession,
-  threadId?: number,
-): Promise<PausedState> {
+) {
   if (!session) {
     throw new Error("No active debug session");
   }
-
-  // Get all threads
-  const threadsResponse = await session.customRequest("threads");
-  const threads = (threadsResponse.threads || []) as Thread[];
-  if (!threads.length) {
-    throw new Error("No threads available");
-  }
-
-  // If no threadId provided, try to find a paused thread
-  if (typeof threadId !== "number") {
-    // Get all stopped threads
-    const stoppedThreads: Thread[] = [];
-    for (const thread of threads) {
-      try {
-        // Try to get stack trace - this will fail if thread isn't stopped
-        await session.customRequest("stackTrace", { threadId: thread.id });
-        stoppedThreads.push(thread);
-      } catch {
-        continue; // Thread is not stopped
-      }
-    }
-
-    if (stoppedThreads.length === 0) {
-      log.debug("No paused threads found");
-      return {
-        breakpoints: [],
-        pausedStack: [],
-        topFrameVariables: [],
-      };
-    }
-
-    threadId = stoppedThreads[0].id;
-    log.debug(`Using paused thread ${threadId}`);
-  }
-
-  // Gather all breakpoints from VSCode
-  const breakpoints: SourceBreakpointInfo[] = vscode.debug.breakpoints
-    .map((bp) => {
-      if (bp instanceof vscode.SourceBreakpoint) {
-        return {
-          file: bp.location.uri.fsPath,
-          line: bp.location.range.start.line + 1,
-        };
-      }
-      return null;
-    })
-    .filter((bp): bp is SourceBreakpointInfo => bp !== null);
-
-  const pausedStack: StackFrame[] = [];
-  const topFrameVariables: ScopeVariables[] = [];
-
-  // Get stack trace for the specified thread
-  const stackTraceResponse = await session.customRequest("stackTrace", { threadId });
-  if (stackTraceResponse.stackFrames) {
-    pausedStack.push(...stackTraceResponse.stackFrames);
-  }
-
-  return { breakpoints, pausedStack, topFrameVariables };
+  return {
+    breakpoints: vscode.debug.breakpoints.filter((breakpoint) =>
+      breakpoint.enabled
+    ),
+    pausedStack: await getPusedStack(session),
+    topFrameVariables: await getTopFrameVariables(session),
+  };
 }
