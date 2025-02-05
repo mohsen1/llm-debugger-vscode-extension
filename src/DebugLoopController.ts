@@ -55,7 +55,7 @@ export class DebugLoopController extends EventEmitter {
     }
 
     async setInitialBreakpoints() {
-        log.info("Setting initial breakpoints...");
+        log.ai("Setting initial breakpoints");
         const response = await callLlm(
             getInitialBreakpointsMessage(this.structuredCode),
             breakpointFunctions,
@@ -63,7 +63,7 @@ export class DebugLoopController extends EventEmitter {
         const [choice] = response.choices;
         const content = choice?.message?.content;
         if (content) {
-            log.ai(content);
+            log.info(content);
         }
     }
 
@@ -94,7 +94,7 @@ export class DebugLoopController extends EventEmitter {
         const [choice] = llmResponse.choices;
         const content = choice?.message?.content;
         if (content) {
-            log.ai(content);
+            log.info(content);
         }
 
         await this.handleLlmFunctionCall(llmResponse);

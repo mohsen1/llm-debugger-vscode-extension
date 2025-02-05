@@ -28,9 +28,11 @@ class Logger {
 
   ai(...msgs: string[]) {
     this.outputChannel.appendLine(chalk.blue(`AI: `) + msgs.join(" "));
-    this.thinkingTimeout = setInterval(() => {
-      this.outputChannel.append('🁢');
-    }, 250);
+    if (!this.thinkingTimeout) {
+      this.thinkingTimeout = setInterval(() => {
+        this.outputChannel.append('🁢');
+      }, 250);
+    }
   }
 
   fn(...msgs: string[]) {
