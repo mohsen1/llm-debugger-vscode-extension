@@ -10,9 +10,7 @@
       "presentation": {
         "reveal": "never"
       },
-      "problemMatcher": [
-
-      ],
+      "problemMatcher": [],
       "group": "build"
     }
   ]

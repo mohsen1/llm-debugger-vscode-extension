@@ -6,6 +6,6 @@
  * @returns {T[]} The modified array
  */
 export function appendArray(arr, ...args) {
-  arr.push(...args)
-  return arr
+  arr.push(...args);
+  return arr;
 }
