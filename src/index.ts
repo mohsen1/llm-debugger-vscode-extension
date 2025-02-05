@@ -1,3 +1,4 @@
+import process from 'node:process'
 import * as vscode from 'vscode'
 import { breakpointFunctions, callLlm, debugFunctions } from './chatTools'
 import { gatherWorkspaceCode } from './codeParser'
@@ -7,7 +8,7 @@ import {
 } from './debugActions'
 import { getInitialBreakpointsMessage, getPausedMessage } from './prompts'
 import type { StructuredCode } from './types'
-import * as log from './log'
+import log from './log'
 import { gatherPausedState } from './state'
 
 // Store the structured code so we can annotate breakpoints on it whenever we pause
@@ -27,58 +28,77 @@ async function setupInitialBreakpoints() {
   await handleLlmFunctionCall(initialResponse)
 }
 
-function debugLoop() {
-  let live = false
+class DebugLoopController {
+  #live = false
+  #currentThreadId: number | undefined
 
-  async function loop(session: vscode.DebugSession) {
-    if (!session)
+  async #loop(session: vscode.DebugSession) {
+    if (!session || !this.#live)
       return
 
-    await session.customRequest('continue') // continue to the next breakpoint
-    const pausedState = await gatherPausedState(session)
+    const pausedState = await gatherPausedState(session, this.#currentThreadId)
     markBreakpointsInCode(structuredCode, pausedState.breakpoints)
 
     log.debug('Calling LLM with paused state.')
-    // Call the LLM with the updated state
     const pausedResponse = await callLlm(getPausedMessage(structuredCode, pausedState), debugFunctions)
 
     await handleLlmFunctionCall(pausedResponse)
-
     log.debug('LLM function call handled.')
 
-    if (live)
-      loop(session)
+    if (this.#live)
+      this.#loop(session)
   }
 
-  function stop() {
-    live = false
+  stop() {
+    this.#live = false
   }
 
-  function start(session: vscode.DebugSession) {
-    live = true
-    return loop(session)
+  start(session: vscode.DebugSession, threadId: number) {
+    this.#currentThreadId = threadId
+    this.#live = true
+    return this.#loop(session)
   }
-
-  return { stop, start }
 }
+
+process.on('uncaughtException', (error) => {
+  log.error('Uncaught exception:', error)
+})
 
 export function activate(context: vscode.ExtensionContext) {
   log.debug('LLM Debugger activated.')
 
   const command = vscode.commands.registerCommand('llm-debugger.startLLMDebug', async () => {
-    const { stop, start } = debugLoop()
+    const debugLoopController = new DebugLoopController()
 
     const disposable = vscode.debug.registerDebugAdapterTrackerFactory('pwa-node', {
       createDebugAdapterTracker(session: vscode.DebugSession) {
         return {
           async onWillStartSession() {
-            // The parent process itself is not what we launched
+            log.debug('onWillStartSession', session.id)
             if (session.parentSession) {
-              await session.parentSession.customRequest('pause')
               await setupInitialBreakpoints()
-              await start(session)
+              await session.parentSession.customRequest('pause')
             }
-            await session.customRequest('pause')
+            else {
+              await session.customRequest('pause')
+            }
+          },
+
+          onWillStopSession() {
+            debugLoopController.stop()
+          },
+
+          onError(error: Error) {
+            log.error('createDebugAdapterTracker', session.id, String(error))
+          },
+
+          onDidSendMessage: async (message: any) => {
+            log.debug('onDidSendMessage', session.id, JSON.stringify(message))
+            if (message.event === 'stopped') {
+              const { threadId, reason } = message.body
+              log.debug(`Debug session paused on thread ${threadId}, reason: ${reason}`)
+              debugLoopController.start(session, threadId)
+            }
           },
         }
       },
@@ -86,7 +106,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     log.clear()
     // Now launch the actual debug session
-    await vscode.debug.startDebugging(undefined, {
+    await vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], {
       type: 'pwa-node',
       request: 'launch',
       name: 'LLM Debugger',
@@ -98,7 +118,7 @@ export function activate(context: vscode.ExtensionContext) {
     // If the session ends, we can do any cleanup
     vscode.debug.onDidTerminateDebugSession((_) => {
       disposable.dispose()
-      stop()
+      debugLoopController.stop()
     })
   })
 

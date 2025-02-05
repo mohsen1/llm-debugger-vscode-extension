@@ -1,6 +1,6 @@
 import type { ChatCompletionSystemMessageParam } from 'openai/resources'
 import type { PausedState, StructuredCode } from './types'
-import * as log from './log'
+import log from './log'
 
 export const systemMessage: ChatCompletionSystemMessageParam = {
   role: 'system',

@@ -2,6 +2,7 @@
   "publisher": "mohsen1",
   "name": "llm-debugger",
   "displayName": "LLM Debugger",
+  "type": "module",
   "version": "0.0.0",
   "private": true,
   "volta": {
@@ -11,18 +12,6 @@
   "description": "This is a VSCode extension that allows you to debug your code using an LLM.",
   "author": "Mohsen Azimi <me@azimi.me>",
   "license": "MIT",
-  "funding": "https://github.com/sponsors/antfu",
-  "homepage": "https://github.com/mohsen1/llm-debugger#readme",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mohsen1/llm-debugger"
-  },
-  "bugs": {
-    "url": "https://github.com/mohsen1/llm-debugger/issues"
-  },
-  "sponsor": {
-    "url": "https://github.com/sponsors/mohsen1"
-  },
   "keywords": [
     "debug",
     "debugger",
@@ -31,7 +20,6 @@
     "openai"
   ],
   "categories": [
-    "Other",
     "Debuggers"
   ],
   "main": "./dist/index.js",
@@ -67,12 +55,12 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --external vscode",
-    "dev": "nr build --watch",
+    "build": "tsc",
+    "dev": "tsc --watch",
     "prepare": "nr update",
     "update": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
-    "vscode:prepublish": "nr build",
+    "vscode:prepublish": "tsc",
     "publish": "vsce publish --no-dependencies",
     "pack": "vsce package --no-dependencies",
     "test": "vitest",
@@ -81,6 +69,7 @@
   },
   "dependencies": {
     "@vscode/debugadapter": "^1.68.0",
+    "chalk": "^5.4.1",
     "openai": "^4.82.0"
   },
   "devDependencies": {
@@ -91,9 +80,7 @@
     "@vscode/vsce": "^3.0.0",
     "bumpp": "^9.5.1",
     "eslint": "^9.9.0",
-    "esno": "^4.7.0",
     "reactive-vscode": "^0.2.0",
-    "tsup": "^8.2.4",
     "typescript": "^5.5.4",
     "vite": "^5.4.1",
     "vitest": "^2.0.5",

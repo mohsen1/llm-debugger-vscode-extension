@@ -1,7 +1,7 @@
 import * as path from 'node:path'
 import type { ChatCompletion } from 'openai/resources'
 import * as vscode from 'vscode'
-import { debug, error, info, warn } from './log'
+import log from './log'
 
 export async function setBreakpoint(functionArgsString: string) {
   try {
@@ -20,13 +20,13 @@ export async function setBreakpoint(functionArgsString: string) {
     vscode.debug.addBreakpoints([breakpoint])
   }
   catch (err) {
-    error(`Failed to set breakpoint: ${String(err)}`)
+    log.error(`Failed to set breakpoint: ${String(err)}`)
     vscode.window.showErrorMessage(`Failed to set breakpoint: ${String(err)}`)
   }
 }
 
 export async function removeBreakpoint(functionArgsString: string) {
-  debug(`Removing breakpoint: ${functionArgsString}`)
+  log.debug(`Removing breakpoint: ${functionArgsString}`)
   try {
     const { file, line } = JSON.parse(functionArgsString)
     const allBreakpoints = vscode.debug.breakpoints
@@ -43,92 +43,92 @@ export async function removeBreakpoint(functionArgsString: string) {
 
     if (toRemove.length) {
       vscode.debug.removeBreakpoints(toRemove)
-      info(`Removed ${toRemove.length} breakpoint(s) at ${file}:${line}`)
+      log.info(`Removed ${toRemove.length} breakpoint(s) at ${file}:${line}`)
       vscode.window.showInformationMessage(`Removed breakpoint at ${file}:${line}`)
     }
     else {
-      warn(`No breakpoint found at ${file}:${line} to remove.`)
+      log.warn(`No breakpoint found at ${file}:${line} to remove.`)
       vscode.window.showWarningMessage(`No breakpoint found at ${file}:${line} to remove.`)
     }
   }
   catch (err) {
-    error(`Failed to remove breakpoint: ${String(err)}`)
+    log.error(`Failed to remove breakpoint: ${String(err)}`)
     vscode.window.showErrorMessage(`Failed to remove breakpoint: ${String(err)}`)
   }
 }
 
 export async function stepOver() {
-  debug('Stepping over the current line.')
+  log.debug('Stepping over the current line.')
   const session = vscode.debug.activeDebugSession
   if (!session) {
-    debug('Cannot stepOver. No active debug session.')
+    log.debug('Cannot stepOver. No active debug session.')
     return
   }
   try {
     await session.customRequest('next')
-    info('Stepped over the current line.')
+    log.info('Stepped over the current line.')
   }
   catch (err) {
-    error(`Failed to step over: ${String(err)}`)
+    log.error(`Failed to step over: ${String(err)}`)
   }
 }
 
 export async function stepIn() {
-  debug('Stepping into the current function call.')
+  log.debug('Stepping into the current function call.')
   const session = vscode.debug.activeDebugSession
   if (!session) {
-    debug('Cannot stepIn. No active debug session.')
+    log.debug('Cannot stepIn. No active debug session.')
     return
   }
   try {
     await session.customRequest('stepIn')
-    info('Stepped into the current function call.')
+    log.info('Stepped into the current function call.')
   }
   catch (err) {
-    error(`Failed to step in: ${String(err)}`)
+    log.error(`Failed to step in: ${String(err)}`)
   }
 }
 
 export async function stepOut() {
   const session = vscode.debug.activeDebugSession
   if (!session) {
-    debug('Cannot stepOut. No active debug session.')
+    log.debug('Cannot stepOut. No active debug session.')
     return
   }
   try {
     await session.customRequest('stepOut')
-    info('Stepped out of the current function call.')
+    log.info('Stepped out of the current function call.')
   }
   catch (err) {
-    error(`Failed to step out: ${String(err)}`)
+    log.error(`Failed to step out: ${String(err)}`)
   }
 }
 
 export async function continueExec() {
   const session = vscode.debug.activeDebugSession
   if (!session) {
-    debug('Cannot continue. No active debug session.')
+    log.debug('Cannot continue. No active debug session.')
     return
   }
   try {
     await session.customRequest('continue')
-    info('Continued execution.')
+    log.info('Continued execution.')
   }
   catch (err) {
-    error(`Failed to continue: ${String(err)}`)
+    log.error(`Failed to continue: ${String(err)}`)
   }
 }
 
 export async function handleLlmFunctionCall(completion: ChatCompletion) {
   const choice = completion?.choices?.[0]
   if (!choice) {
-    debug(`No choice found in completion. ${JSON.stringify(completion)}`)
+    log.debug(`No choice found in completion. ${JSON.stringify(completion)}`)
     return { shouldContinue: true }
   }
 
   for (const toolCall of choice.message?.tool_calls || []) {
     const { name, arguments: argsStr } = toolCall.function
-    info(`${name}(${argsStr || ''})`)
+    log.fn(`${name}(${argsStr || ''})`)
 
     switch (name) {
       case 'setBreakpoint':

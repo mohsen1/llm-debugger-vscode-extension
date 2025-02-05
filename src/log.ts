@@ -1,27 +1,44 @@
 import * as vscode from 'vscode'
+import chalk from 'chalk'
 
-const outputChannel = vscode.window.createOutputChannel('LLM Debugger')
+class Logger {
+  private outputChannel: vscode.OutputChannel
 
-export function show() {
-  outputChannel.show()
+  constructor() {
+    this.outputChannel = vscode.window.createOutputChannel('LLM Debugger')
+  }
+
+  show() {
+    this.outputChannel.show()
+  }
+
+  clear() {
+    this.outputChannel.clear()
+  }
+
+  ai(...msgs: string[]) {
+    this.outputChannel.appendLine(chalk.blue(`AI: `) + msgs.join(' '))
+  }
+
+  fn(...msgs: string[]) {
+    this.outputChannel.appendLine(chalk.green(`FN: `) + msgs.join(' '))
+  }
+
+  debug(...msgs: string[]) {
+    this.outputChannel.appendLine(chalk.gray(`DEBUG: `) + msgs.join(' '))
+  }
+
+  info(...msgs: string[]) {
+    this.outputChannel.appendLine(chalk.cyan(`INFO: `) + msgs.join(' '))
+  }
+
+  error(...msgs: string[]) {
+    this.outputChannel.appendLine(chalk.red(`ERROR: `) + msgs.join(' '))
+  }
+
+  warn(...msgs: string[]) {
+    this.outputChannel.appendLine(chalk.yellow(`WARN: `) + msgs.join(' '))
+  }
 }
 
-export function clear() {
-  outputChannel.clear()
-}
-
-export function debug(...msgs: string[]) {
-  outputChannel.appendLine(`DEBUG: ${msgs.join(' ')}`)
-}
-
-export function info(...msgs: string[]) {
-  outputChannel.appendLine(`INFO: ${msgs.join(' ')}`)
-}
-
-export function error(...msgs: string[]) {
-  outputChannel.appendLine(`ERROR: ${msgs.join(' ')}`)
-}
-
-export function warn(...msgs: string[]) {
-  outputChannel.appendLine(`WARN: ${msgs.join(' ')}`)
-}
+export default new Logger()

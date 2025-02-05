@@ -5,7 +5,7 @@ import path from 'node:path'
 import { OpenAI } from 'openai'
 import type { ChatCompletion } from 'openai/resources/chat/completions'
 import type { ChatCompletionMessageParam, ChatCompletionTool } from './types'
-import * as log from './log'
+import log from './log'
 
 export const systemMessage: ChatCompletionMessageParam = {
   role: 'system' as const,
@@ -102,7 +102,7 @@ export async function callLlm(prompt: string, functions?: ChatCompletionTool[]):
     max_tokens: 1000, // quick tool calls
   })
 
-  log.info(completion.choices[0].message.content || '')
+  log.ai(completion.choices[0].message.content || '')
 
   cache.set(prompt, completion)
   fs.writeFileSync(promptCacheFile, JSON.stringify(Array.from(cache.entries()), null, 2))
