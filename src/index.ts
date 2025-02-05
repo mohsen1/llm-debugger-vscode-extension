@@ -60,9 +60,6 @@ class DebugLoopController {
   }
 }
 
-process.on('uncaughtException', (error: Error) => {
-  log.error('Uncaught exception:', String(error))
-})
 
 export function activate(context: vscode.ExtensionContext) {
   log.debug('LLM Debugger activated.')
@@ -93,8 +90,8 @@ export function activate(context: vscode.ExtensionContext) {
           },
 
           onDidSendMessage: async (message: { event: string, body: { threadId: number, reason: string } }) => {
-            log.debug('onDidSendMessage', session.id, JSON.stringify(message))
             if (message.event === 'stopped') {
+              log.debug('onDidSendMessage', session.id, JSON.stringify(message))
               const { threadId, reason } = message.body
               log.debug(`Debug session paused on thread ${threadId}, reason: ${reason}`)
               debugLoopController.start(session, threadId)

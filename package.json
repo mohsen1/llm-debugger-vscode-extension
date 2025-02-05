@@ -2,7 +2,6 @@
   "publisher": "mohsen1",
   "name": "llm-debugger",
   "displayName": "LLM Debugger",
-  "type": "module",
   "version": "0.0.0",
   "private": true,
   "volta": {
@@ -22,11 +21,11 @@
   "categories": [
     "Debuggers"
   ],
-  "main": "./dist/index.js",
+  "main": "./out/index.js",
   "icon": "res/icon.png",
   "files": [
+    "out/*",
     "LICENSE.md",
-    "dist/*",
     "res/*"
   ],
   "engines": {
@@ -55,8 +54,8 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "esbuild src/index.ts --bundle --platform=node --outdir=out --format=cjs --sourcemap --external:vscode --external:@vscode/* --minify=false --keep-names",
+    "dev": "pnpm build --watch",
     "update": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
     "vscode:prepublish": "tsc",
@@ -76,10 +75,11 @@
     "@types/vscode": "1.96.0",
     "@vscode/vsce": "^3.0.0",
     "bumpp": "^9.5.1",
+    "esbuild": "^0.24.2",
     "eslint": "^9.19.0",
-    "typescript-eslint": "^8.23.0",
     "reactive-vscode": "^0.2.0",
     "typescript": "^5.5.4",
+    "typescript-eslint": "^8.23.0",
     "vite": "^5.4.1",
     "vitest": "^2.0.5",
     "vscode-ext-gen": "^0.4.1"

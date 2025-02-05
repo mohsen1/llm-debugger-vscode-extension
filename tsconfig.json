@@ -3,18 +3,20 @@
     "target": "es2020",
     "lib": ["esnext"],
     "rootDir": ".",
-    "module": "esnext",
-    "moduleResolution": "node",
-    "types": ["vscode", "node", "vitest"],
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "types": ["vscode", "node", "vitest", "openai"],
     "strict": true,
     "outDir": "out",
     "sourceMap": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "resolveJsonModule": true
   },
   "include": [
     "src/**/*",
-    "test/**/*",
+    "test/**/*"
   ],
   "exclude": [
     "node_modules",
