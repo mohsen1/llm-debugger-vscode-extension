@@ -1,4 +1,3 @@
-
 import * as vscode from "vscode";
 import { DebugLoopController } from "./DebugLoopController";
 import { DebugAdapterTracker } from "./DebugAdapterTracker";
@@ -8,13 +7,6 @@ import log from "./log";
 const debugLoopController = new DebugLoopController();
 
 export async function activate(context: vscode.ExtensionContext) {
-
-  debugLoopController.reset();
-  
-  // Pre-fetch structured code
-  const code = gatherWorkspaceCode();
-  debugLoopController.setCode(code);
-
   // Register debug tracker so we can handle events like "stopped"
   vscode.debug.registerDebugAdapterTrackerFactory("*", {
     createDebugAdapterTracker(session) {
@@ -22,14 +14,14 @@ export async function activate(context: vscode.ExtensionContext) {
     },
   });
 
-
-  // setup initial breakpoints
-  await debugLoopController.setInitialBreakpoints();
-
   const startCommand = vscode.commands.registerCommand(
     "llm-debugger.startLLMDebug",
     async () => {
-      // Start the debug session
+      log.show();
+      debugLoopController.reset();
+      await debugLoopController.setInitialBreakpoints();
+      const code = gatherWorkspaceCode();
+      debugLoopController.setCode(code);
       await debugLoopController.start();
       await vscode.debug.startDebugging(undefined, {
         type: "node",
@@ -39,10 +31,9 @@ export async function activate(context: vscode.ExtensionContext) {
         program: "${workspaceFolder}/array.test.js",
         env: { NODE_ENV: "test" },
       });
-      log.show();
-    }
+      log.show()
+    },
   );
-
 
   context.subscriptions.push(startCommand);
 }

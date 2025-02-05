@@ -5,7 +5,6 @@ import path from "node:path";
 import { OpenAI } from "openai";
 import type { ChatCompletion } from "openai/resources/chat/completions";
 import type { ChatCompletionMessageParam, ChatCompletionTool } from "./types";
-import log from "./log";
 
 export const initialBreakPointsSystemMessage: ChatCompletionMessageParam = {
   role: "system" as const,

@@ -75,7 +75,6 @@ export class DebugLoopController extends EventEmitter {
     }
 
     async loop() {
-        log.debug("loop");
         if (!this.session) return;
         if (!this.live) return;
 
@@ -84,7 +83,7 @@ export class DebugLoopController extends EventEmitter {
         if (this.finishing) return;
         if (!this.live) return;
 
-        log.ai("Thinking...");
+        log.ai("Thinking");
         const llmResponse = await this.chatWithHistory.ask(
             getPausedMessage(this.structuredCode, pausedState),
         );
@@ -115,7 +114,7 @@ export class DebugLoopController extends EventEmitter {
         this.finishing = true;
 
         log.ai(
-            "Debug session finished. Providing code fix and explanation...",
+            "Debug session finished. Providing code fix and explanation",
         );
 
         // Provide final fix explanation if wanted...
@@ -126,7 +125,9 @@ export class DebugLoopController extends EventEmitter {
         const [choice] = response.choices;
         const content = choice?.message?.content;
         if (content) {
-            log.ai(content);
+            log.info(content);
+        } else {
+            log.info("No content from LLM");
         }
 
         this.stop();
@@ -190,11 +191,6 @@ export class DebugLoopController extends EventEmitter {
                 );
                 vscode.window.showInformationMessage(
                     `Removed breakpoint at ${file}:${line}`,
-                );
-            } else {
-                log.warn(`No breakpoint found at ${file}:${line} to remove.`);
-                vscode.window.showWarningMessage(
-                    `No breakpoint found at ${file}:${line} to remove.`,
                 );
             }
         } catch (err) {
