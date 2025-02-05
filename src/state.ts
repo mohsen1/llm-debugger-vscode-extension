@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { Scope, StackFrame, Variable } from "@vscode/debugadapter";
+import type {  StackFrame, Thread, Variable } from "@vscode/debugadapter";
 import log from "./log";
 
 interface SourceBreakpointInfo {
@@ -35,7 +35,7 @@ export async function gatherPausedState(
 
   // Get all threads
   const threadsResponse = await session.customRequest("threads");
-  const threads = threadsResponse.threads || [];
+  const threads = (threadsResponse.threads || []) as Thread[];
   if (!threads.length) {
     throw new Error("No threads available");
   }
@@ -43,13 +43,13 @@ export async function gatherPausedState(
   // If no threadId provided, try to find a paused thread
   if (typeof threadId !== "number") {
     // Get all stopped threads
-    const stoppedThreads = [];
+    const stoppedThreads: Thread[] = [];
     for (const thread of threads) {
       try {
         // Try to get stack trace - this will fail if thread isn't stopped
         await session.customRequest("stackTrace", { threadId: thread.id });
         stoppedThreads.push(thread);
-      } catch (e) {
+      } catch {
         continue; // Thread is not stopped
       }
     }
@@ -80,56 +80,13 @@ export async function gatherPausedState(
     })
     .filter((bp): bp is SourceBreakpointInfo => bp !== null);
 
-  let pausedStack: StackFrame[] = [];
+  const pausedStack: StackFrame[] = [];
   const topFrameVariables: ScopeVariables[] = [];
 
-  try {
-    // Get stack trace for the specific thread
-    const stackTrace = await session.customRequest("stackTrace", { threadId });
-    pausedStack = stackTrace.stackFrames || [];
-
-    // If we have at least one frame, gather variables from the top frame
-    if (pausedStack.length > 0) {
-      const [topFrame] = pausedStack;
-
-      // Get scopes for top frame
-      const scopesResp = await session.customRequest("scopes", {
-        frameId: topFrame.id,
-      });
-      const scopes = scopesResp.scopes || [];
-
-      // Fetch all variables in parallel
-      const scopeVariablePromises = scopes.map(async (scope: Scope) => {
-        try {
-          const varsResp = await session.customRequest("variables", {
-            variablesReference: scope.variablesReference,
-          });
-          return {
-            scopeName: scope.name,
-            variables: varsResp.variables || [],
-          };
-        } catch (err) {
-          log.error(
-            `Failed to get variables for scope "${scope.name}": ${String(err)}`,
-          );
-          return {
-            scopeName: scope.name,
-            variables: [],
-          };
-        }
-      });
-
-      const resolvedScopeVariables = await Promise.all(scopeVariablePromises);
-      topFrameVariables.push(...resolvedScopeVariables);
-    }
-  } catch (e) {
-    log.debug(`Failed to gather stack trace for thread ${threadId}: ${String(e)}`);
-    // Return empty state if we can't get stack trace
-    return {
-      breakpoints,
-      pausedStack: [],
-      topFrameVariables: [],
-    };
+  // Get stack trace for the specified thread
+  const stackTraceResponse = await session.customRequest("stackTrace", { threadId });
+  if (stackTraceResponse.stackFrames) {
+    pausedStack.push(...stackTraceResponse.stackFrames);
   }
 
   return { breakpoints, pausedStack, topFrameVariables };

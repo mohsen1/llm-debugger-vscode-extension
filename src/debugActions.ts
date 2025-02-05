@@ -61,7 +61,6 @@ export async function removeBreakpoint(functionArgsString: string) {
 }
 
 export async function next() {
-  log.debug("Stepping over the current line.");
   const session = vscode.debug.activeDebugSession;
   if (!session) {
     log.debug("Cannot run command 'next'. No active debug session.");
@@ -78,7 +77,6 @@ export async function next() {
     }
 
     await session.customRequest("next", { threadId });
-    log.info("Stepped over the current line.");
   } catch (err) {
     log.error(`Failed to run command 'next': ${String(err)}`);
   }

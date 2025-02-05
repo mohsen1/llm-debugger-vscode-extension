@@ -1,6 +1,5 @@
 import type { ChatCompletionSystemMessageParam } from "openai/resources";
 import type { PausedState, StructuredCode } from "./types";
-import log from "./log";
 
 export const systemMessage: ChatCompletionSystemMessageParam = {
   role: "system",
@@ -21,24 +20,35 @@ export function getInitialBreakpointsMessage(
 
 export function getPausedMessage(
   structuredCode: StructuredCode[],
-  pausedState: PausedState,
+  pausedState: PausedState | null,
 ): string {
-  return [
+  const message = [
     "Code:",
     serializeStructuredCode(structuredCode),
     "",
-    "Current Debug State:",
-    "Breakpoints:",
-    serializeBreakpoints(pausedState.breakpoints),
-    "",
-    "Stack Trace:",
-    JSON.stringify(pausedState.pausedStack, null, 2),
-    "",
-    "Variables:",
-    JSON.stringify(pausedState.topFrameVariables, null, 2),
-    "",
+  ];
+  
+  if (pausedState) {
+    message.push(
+      "Current Debug State:",
+      "Breakpoints:",
+      serializeBreakpoints(pausedState.breakpoints),
+      "",
+      "Stack Trace:",
+      JSON.stringify(pausedState.pausedStack, null, 2),
+      "",
+      "Variables:",
+      JSON.stringify(pausedState.topFrameVariables, null, 2),
+      "",
+    );
+  }
+
+  message.push(
+    "Debugger is in paused state",
     "Choose next action by calling setBreakpoint, removeBreakpoint, next, stepIn, stepOut, or continueExec.",
-  ].join("\n");
+  );
+
+  return message.join("\n");
 }
 
 function serializeBreakpoints(breakpoints: PausedState["breakpoints"]) {
@@ -49,12 +59,14 @@ function serializeStructuredCode(structuredCode: StructuredCode[]) {
   const serialized = structuredCode
     .map(
       ({ filePath, lines }) =>
-        `${filePath}\n${lines
-          .map(
-            ({ lineNumber, text }) =>
-              `${String(lineNumber).padStart(3, " ")}| ${text}`,
-          )
-          .join("\n")}`,
+        `${filePath}\n${
+          lines
+            .map(
+              ({ lineNumber, text }) =>
+                `${String(lineNumber).padStart(3, " ")}| ${text}`,
+            )
+            .join("\n")
+        }`,
     )
     .join("\n\n");
 

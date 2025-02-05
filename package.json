@@ -32,13 +32,12 @@
     "vscode": "^1.96.0"
   },
   "activationEvents": [
-    "onDebugResolve:node",
-    "onDebugAdapterProtocolTracker:pwa-node"
+    "onDebugResolve:node"
   ],
   "contributes": {
     "debuggers": [
       {
-        "type": "pwa-node"
+        "type": "node"
       }
     ],
     "commands": [

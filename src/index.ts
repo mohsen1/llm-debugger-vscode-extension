@@ -1,50 +1,67 @@
 import * as vscode from "vscode";
-import { breakpointFunctions, callLlm, debugFunctions } from "./chatTools";
+import {
+  breakpointFunctions,
+  callLlm,
+  ChatWithHistory,
+  debugFunctions,
+  debugLoopSystemMessage,
+} from "./chatTools";
 import { gatherWorkspaceCode } from "./codeParser";
 import { handleLlmFunctionCall, markBreakpointsInCode } from "./debugActions";
 import { getInitialBreakpointsMessage, getPausedMessage } from "./prompts";
 import type { StructuredCode } from "./types";
 import log from "./log";
 import { gatherPausedState } from "./state";
+import { Thread } from "@vscode/debugadapter";
 
-// Store the structured code so we can annotate breakpoints on it whenever we pause
 const structuredCode: StructuredCode[] = [];
 
 async function setupInitialBreakpoints() {
   const structuredCode = await gatherWorkspaceCode();
 
-  // Clearn all breakpoints (TODO: this should not be in the final implementation)
+  // Clear all breakpoints
   await vscode.debug.removeBreakpoints(
-    vscode.debug.breakpoints.filter((breakpoint) => breakpoint.enabled),
+    vscode.debug.breakpoints.filter((breakpoint) => breakpoint.enabled)
   );
 
   const initialResponse = await callLlm(
     getInitialBreakpointsMessage(structuredCode),
-    breakpointFunctions,
+    breakpointFunctions
   );
   await handleLlmFunctionCall(initialResponse);
+}
+
+async function getPausedState(session: vscode.DebugSession, threadId: number | undefined) {
+  if (!threadId) {
+    return null;
+  }
+  try {
+    const pausedState = await gatherPausedState(session, threadId);
+    markBreakpointsInCode(structuredCode, pausedState.breakpoints);
+    return pausedState;
+  } catch (error) {
+    log.error("Error gathering paused state", String(error));
+    return null;
+  }
 }
 
 class DebugLoopController {
   #live = false;
   #currentThreadId: number | undefined;
+  #chatWithHistory = new ChatWithHistory(debugLoopSystemMessage, debugFunctions);
 
   async #loop(session: vscode.DebugSession) {
     if (!session || !this.#live) {
+      log.debug("Not looping", JSON.stringify({ session, live: this.#live }));
       return;
-    }
-
-    const pausedState = await gatherPausedState(session, this.#currentThreadId);
-    markBreakpointsInCode(structuredCode, pausedState.breakpoints);
-
-    log.ai("Sending paused state to LLM.");
-    const pausedResponse = await callLlm(
-      getPausedMessage(structuredCode, pausedState),
-      debugFunctions,
+    };
+    
+    const pausedState = await getPausedState(session, this.#currentThreadId);
+    log.ai("Asking...");
+    const llmResponse = await this.#chatWithHistory.ask(
+      getPausedMessage(structuredCode, pausedState)
     );
-
-    await handleLlmFunctionCall(pausedResponse);
-    log.debug("LLM function call handled.");
+    await handleLlmFunctionCall(llmResponse);
 
     const activeDebugSession = vscode.debug.activeDebugSession;
     if (!activeDebugSession) {
@@ -60,87 +77,109 @@ class DebugLoopController {
     this.#live = false;
   }
 
-  start(session: vscode.DebugSession, threadId: number) {
+  async start(session: vscode.DebugSession, threadId: number) {
     this.#currentThreadId = threadId;
-    this.#live = true;
-    return this.#loop(session);
+    
+    if (!this.#live) {
+      this.#live = true;
+      return this.#loop(session);
+    }
   }
 }
 const debugLoopController = new DebugLoopController();
 
-const disposable = vscode.debug.registerDebugAdapterTrackerFactory("*", {
-  createDebugAdapterTracker(session: vscode.DebugSession) {
-    return {
-      async onWillStartSession() {
-        if (session.parentSession) {
-          log.debug("onWillStartSession", session.id, " now setting initial breakpoints");
-          await setupInitialBreakpoints();
-        }
-      },
-
-      onWillStopSession() {
-        // debugLoopController.stop();
-      },
-
-      onError(error: Error) {
-        log.error("DebugAdapterTracker error on session", session.id)
-        log.error(String(error))
-      },
-
-      onDidSendMessage: async (message: {
-        event: string;
-        body: { threadId: number; reason: string };
-      }) => {
-        if (message.event === "stopped") {
-          const { threadId, reason } = message.body;
-          if (threadId !== undefined && reason === "entry") {
-            log.debug("Starting debug loop controller");
-            debugLoopController.start(session, threadId);
-          }
-        }
-      },
-    };
-  }
-});
-
-// If the session ends, we can do any cleanup
 vscode.debug.onDidTerminateDebugSession(() => {
-  disposable.dispose();
   debugLoopController.stop();
 });
 
-function startDebugging() {
-  log.clear();
-  log.show();
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-  if (!workspaceFolder) {
-    log.error("No workspace folder found");
-    return;
-  }
-  log.debug("Launching the debug session on", workspaceFolder.uri.fsPath);
-  const started = vscode.debug.startDebugging(undefined, {
-    type: "node",
-    request: "launch",
-    name: "LLM Debugger (Dynamic)",
-    stopOnEntry: true,
-    program: "${workspaceFolder}/array.test.js",
-    env: { NODE_ENV: "test" },
-  });
+class DebugAdapterTracker implements vscode.DebugAdapterTracker {
+  private session: vscode.DebugSession;
 
-  if (!started) {
-    log.error("Failed to start the debug session");
-    log.show();
-    return;
+  constructor(session: vscode.DebugSession) {
+    this.session = session;
+  }
+
+  onWillStartSession(): void {
+    // log.debug("Debug session starting");
+  }
+
+  onWillStopSession(): void {
+    // log.debug("Debug session stopping");
+  }
+
+  async onDidSendMessage(message: { type: string; command: string; body: unknown }): Promise<void> {
+    // Log everything for visibility
+
+    // Capture "threads" response
+    if (message.type === "response" && message.command === "threads") {
+      const body = message.body as { threads: Thread[] };
+      const threads = body.threads || [];
+      if (threads.length > 0) {
+        await debugLoopController.start(this.session, threads[0]?.id);
+      }
+    }
+  }
+
+  onError(error: Error): void {
+    log.error("Debug adapter error:", error.message);
+  }
+
+  onExit(code: number | undefined, signal: string | undefined): void {
+    log.debug(`Debug adapter exit - code: ${code}, signal: ${signal}`);
   }
 }
 
+// We’ll keep track of newly created trackers in a map so we can query them later.
+const trackerMap = new Map<string, DebugAdapterTracker>();
+
+async function startLLMDebug() {
+  try {
+    log.debug("Setting initial breakpoints");
+    await setupInitialBreakpoints();
+
+    log.debug("Starting debug session");
+    const started = await vscode.debug.startDebugging(undefined, {
+      type: "node",
+      request: "launch",
+      name: "LLM Debugger (Dynamic)",
+      stopOnEntry: true,
+      program: "${workspaceFolder}/array.test.js",
+      env: { NODE_ENV: "test" },
+    });
+
+    if (!started) {
+      throw new Error("Failed to start the debug session");
+    }
+  } catch (error) {
+    log.error(`LLM Debug failed: ${String(error)}`);
+    log.show();
+    vscode.window.showErrorMessage(`LLM Debugger error: ${String(error)}`);
+  }
+}
+
+
 export function activate(context: vscode.ExtensionContext) {
+  log.clear();
   log.debug("LLM Debugger activated.");
+  log.show();
+
+  // Register a tracker factory. For an internal debug type, put "node",
+  // or for all debug sessions, use '*'.
+  const debugTrackerFactory = vscode.debug.registerDebugAdapterTrackerFactory("*", {
+    createDebugAdapterTracker(session: vscode.DebugSession) {
+      log.debug(`Creating debug tracker for session: ${session.name}`);
+      const tracker = new DebugAdapterTracker(session);
+      trackerMap.set(session.id, tracker);
+      return tracker;
+    }
+  });
+
   const command = vscode.commands.registerCommand(
     "llm-debugger.startLLMDebug",
-    startDebugging,
+    startLLMDebug
   );
-  context.subscriptions.push(command);
+
+  context.subscriptions.push(command, debugTrackerFactory);
 }
 
 export function deactivate() {

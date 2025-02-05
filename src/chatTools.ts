@@ -5,12 +5,17 @@ import path from "node:path";
 import { OpenAI } from "openai";
 import type { ChatCompletion } from "openai/resources/chat/completions";
 import type { ChatCompletionMessageParam, ChatCompletionTool } from "./types";
-import log from "./log";
 
-export const systemMessage: ChatCompletionMessageParam = {
+export const initialBreakPointsSystemMessage: ChatCompletionMessageParam = {
   role: "system" as const,
   content:
-    "You are an AI assistant that decides debugging steps. Suggest at least one breakpoint before launch.",
+    "You are an AI assistant that sets initial breakpoints before launch of a debugger.",
+};
+
+export const debugLoopSystemMessage: ChatCompletionMessageParam = {
+  role: "system" as const,
+  content:
+    "You are an AI assistant that decides debugging steps. suggest next action by calling a function",
 };
 
 export const breakpointFunctions: ChatCompletionTool[] = [
@@ -78,10 +83,53 @@ export const debugFunctions: ChatCompletionTool[] = [
   },
 ];
 
+export class ChatWithHistory {
+  #messageHistory: ChatCompletionMessageParam[] = [];
+  #functions: ChatCompletionTool[];
+
+  constructor(systemMessage: ChatCompletionMessageParam, functions: ChatCompletionTool[]) {
+    this.#messageHistory = [systemMessage];
+    this.#functions = functions;
+  }
+
+  clearHistory() {
+    this.#messageHistory = [initialBreakPointsSystemMessage];
+  }
+
+  ask(message: string) {
+    // TODO: token count and shift items from the top of the history if necessary
+    this.#messageHistory.push({ role: "user", content: message });
+    return callLlm(this.#messageHistory, this.#functions);
+  }
+}
+
+
 export async function callLlm(
-  prompt: string,
+  promptOrMessages: string | ChatCompletionMessageParam[],
   functions?: ChatCompletionTool[],
 ): Promise<ChatCompletion> {
+  const messages: ChatCompletionMessageParam[] = []
+  if (Array.isArray(promptOrMessages)) {
+    if (promptOrMessages?.[0].role !== 'system'){
+      messages.push(initialBreakPointsSystemMessage);
+    }
+    messages.push(...promptOrMessages);
+  } else {
+    messages.push(initialBreakPointsSystemMessage);
+    messages.push({ role: "user", content: promptOrMessages });
+  }
+  
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    tools: functions,
+    messages, 
+    tool_choice: "required",
+    max_tokens: 1000,
+  });
+
+
   const promptCacheFile = path.join(
     os.homedir(),
     ".llm-debugger-prompt-cache.json",
@@ -89,35 +137,6 @@ export async function callLlm(
   if (!fs.existsSync(promptCacheFile)) {
     fs.writeFileSync(promptCacheFile, JSON.stringify([], null, 2));
   }
-  const cache = new Map<string, ChatCompletion>(
-    JSON.parse(fs.readFileSync(promptCacheFile, "utf8")),
-  );
-  if (cache.has(prompt)) {
-    return cache.get(prompt)!;
-  }
-
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-  const userMessage: ChatCompletionMessageParam = {
-    role: "user",
-    content: prompt,
-  };
-
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    tools: functions,
-    messages: [systemMessage, userMessage],
-    tool_choice: "required",
-    max_tokens: 1000, // quick tool calls
-  });
-
-  log.ai(completion.choices[0].message.content || "");
-
-  cache.set(prompt, completion);
-  fs.writeFileSync(
-    promptCacheFile,
-    JSON.stringify(Array.from(cache.entries()), null, 2),
-  );
 
   return completion;
 }
