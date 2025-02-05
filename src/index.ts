@@ -3,6 +3,7 @@ import { DebugLoopController } from "./DebugLoopController";
 import { DebugAdapterTracker } from "./DebugAdapterTracker";
 import { gatherWorkspaceCode } from "./codeParser";
 import log from "./log";
+import { llmDebuggerSidebarProvider } from "./SidebarView";
 
 const debugLoopController = new DebugLoopController();
 
@@ -36,4 +37,9 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(startCommand);
+
+  const sidebarProvider = new llmDebuggerSidebarProvider();
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider("llmDebuggerSidebar.view", sidebarProvider)
+  );
 }

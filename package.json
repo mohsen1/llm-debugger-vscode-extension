@@ -32,7 +32,8 @@
     "vscode": "^1.96.0"
   },
   "activationEvents": [
-    "onDebugResolve:node"
+    "onDebugResolve:node",
+    "onView:llmDebuggerSidebar.view"
   ],
   "contributes": {
     "debuggers": [
@@ -40,6 +41,24 @@
         "type": "node"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "llmDebuggerSidebar",
+          "title": "LLM Debugger",
+          "icon": "$(rocket)"
+        }
+      ]
+    },
+    "views": {
+      "llmDebuggerSidebar": [
+        {
+          "type": "webview",
+          "id": "llmDebuggerSidebar.view",
+          "name": "LLM Debugger"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "llm-debugger.startLLMDebug",
