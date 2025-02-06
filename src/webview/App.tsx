@@ -48,19 +48,19 @@ export function App() {
     }
   }, [configs, selectedConfig]);
 
-  const handleStartDebug = () => {
-    window.vscodeApi.postMessage({ command: 'chooseConfig', config: selectedConfig })
-    window.vscodeApi.postMessage({ command: "startDebugging" });
-  };
+  // const handleStartDebug = () => {
+  //   window.vscodeApi.postMessage({ command: 'chooseConfig', config: selectedConfig })
+  //   window.vscodeApi.postMessage({ command: "startDebugging" });
+  // };
 
-  const handleConfigChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const configName = e.target.value;
-    const config = configs.find((config) => config.name === configName);
-    if (config) {
-      setSelectedConfig(config);
-      window.vscodeApi.postMessage({ command: "chooseConfig", config: JSON.stringify(config) });
-    }
-  };
+  // const handleConfigChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  //   const configName = e.target.value;
+  //   const config = configs.find((config) => config.name === configName);
+  //   if (config) {
+  //     setSelectedConfig(config);
+  //     window.vscodeApi.postMessage({ command: "chooseConfig", config: JSON.stringify(config) });
+  //   }
+  // };
 
   const renderMarkdown = (message: string) => {
     const markdown = new MarkdownIt();
@@ -75,18 +75,8 @@ export function App() {
   return (
     <div className="sidebar-container">
       <div className="control-panel">
-        <select className="control-selector" onChange={handleConfigChange} value={selectedConfig?.name}>
-          {configs.map((config) => (
-            <option key={config.name} value={config.name}>
-              {config.name} ({config.type})
-            </option>
-          ))}
-        </select>
-        <div>
-          <button id="start-button" onClick={handleStartDebug}>
-            <span>Start Debug</span>
-          </button>
-        </div>
+        <input type="checkbox" id="debug-with-ai" />
+        <label htmlFor="debug-with-ai">Debug with AI</label>
       </div>
 
       {logs.length > 0

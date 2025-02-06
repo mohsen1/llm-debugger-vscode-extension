@@ -4,7 +4,7 @@
   "description": "LLM Debugger Webview",
   "scripts": {
     "build": "parcel build index.html --dist-dir out --cache-dir .parcel-cache",
-    "dev": "parcel watch index.html --dist-dir out --cache-dir .parcel-cache"
+    "dev": "parcel watch index.html --watch-dir . --dist-dir out --cache-dir .parcel-cache"
   },
   "dependencies": {
     "react": "^18.2.0",

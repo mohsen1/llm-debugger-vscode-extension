@@ -28,7 +28,7 @@ body {
 .control-panel {
   display: grid;
   gap: 4px;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr;
 }
 
 .control-selector {
