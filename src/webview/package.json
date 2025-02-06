@@ -4,8 +4,8 @@
     "version": "0.0.1",
     "description": "LLM Debugger Webview",
     "scripts": {
-      "build": "parcel build index.html --dist-dir ../../out/webview --cache-dir .parcel-cache",
-      "dev": "parcel build --watch-dir . index.html --dist-dir ../../out/webview --cache-dir .parcel-cache"
+      "build": "parcel build index.html --dist-dir out --cache-dir .parcel-cache",
+      "dev": "parcel watch index.html --dist-dir out --cache-dir .parcel-cache"
     },
     "dependencies": {
       "react": "^18.2.0",

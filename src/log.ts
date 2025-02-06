@@ -21,7 +21,7 @@ class Logger {
         this.sidebarProvider = provider;
         // Replay existing logs to the new provider
         this.logEntries.forEach(entry => {
-            this.sidebarProvider?.logMessage(entry.message, entry.type);
+            this.sidebarProvider?.logMessage(entry.message, entry.type, entry.timestamp);
         });
     }
 
@@ -30,7 +30,7 @@ class Logger {
         // Replay logs to sidebar if provider exists
         if (this.sidebarProvider) {
             entries.forEach(entry => {
-                this.sidebarProvider?.logMessage(entry.message, entry.type);
+                this.sidebarProvider?.logMessage(entry.message, entry.type, entry.timestamp);
             });
         }
     }
@@ -64,7 +64,7 @@ class Logger {
             timestamp: Date.now() 
         };
         this.logEntries.push(entry);
-        this.sidebarProvider?.logMessage(message, type);
+        this.sidebarProvider?.logMessage(message, type, entry.timestamp);
     }
 
     private writeToOutput(msg: string, level: keyof Pick<vscode.LogOutputChannel, 'debug' | 'error' | 'info' | 'warn' | 'trace'> = 'info') {

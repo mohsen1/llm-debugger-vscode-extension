@@ -41,7 +41,11 @@ export async function activate(context: vscode.ExtensionContext) {
   );
   const sidebarProvider = new llmDebuggerSidebarProvider(context.extensionUri);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider("llmDebuggerSidebar.view", sidebarProvider)
+    vscode.window.registerWebviewViewProvider("llmDebuggerSidebar.view", sidebarProvider, {
+      webviewOptions: {
+        retainContextWhenHidden: true,
+      },
+    })
   );
 
   // Set up logger with restored logs

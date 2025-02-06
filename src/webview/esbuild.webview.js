@@ -5,24 +5,27 @@ const esbuild = require("esbuild");
 
 const watch = process.argv.includes("--watch");
 
+
 esbuild.context({
-  entryPoints: ["src/index.ts"], // or whatever your extension entry is
+  entryPoints: ["src/webview/index.tsx"],
   bundle: true,
   outdir: "out",
-  // output CJS
-  format: "cjs",
-  platform: "node",
+  platform: "browser",
   target: "es2020",
   sourcemap: true,
-  external: ["vscode", "src/webview/"],
+  loader: {
+    '.html': 'copy',
+    '.css': 'css',
+    '.tsx': 'tsx',
+    '.ts': 'ts',
+  },
+  minify: process.env.NODE_ENV === 'production',
 }).then(async (ctx) => {
 
-  if (watch) {
-    console.log("Watching for changes");
-    await ctx.watch();
-  } else {
-    await ctx.rebuild();
-      await ctx.dispose();
-    }
-  });
-  
+if (watch) {
+  await ctx.watch();
+} else {
+  await ctx.rebuild();
+    await ctx.dispose();
+  }
+});

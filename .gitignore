@@ -14,3 +14,4 @@ src/generated
 package/
 out/
 **/*.tsbuildinfo
+.parcel-cache

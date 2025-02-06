@@ -2,7 +2,6 @@ import * as crypto from "crypto";
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as cheerio from "cheerio";
-import log from "./log";
 
 export class llmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
@@ -11,14 +10,13 @@ export class llmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this._view = webviewView;
-    log.debug("Resolving webview view");
 
     // Configure webview settings
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [
-        // Allow access to the 'out/webview' directory.
-        vscode.Uri.joinPath(this._extensionUri, "out", "webview")
+        // Allow access to the 'src/webview/out' directory.
+        vscode.Uri.joinPath(this._extensionUri, "src", "webview", "out")
       ],
     };
 
@@ -36,8 +34,7 @@ export class llmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtmlForWebview(webview: vscode.Webview): string {
-    // Locate the index.html file in your webview folder
-    const webviewOutPath = vscode.Uri.joinPath(this._extensionUri, "out", "webview");
+    const webviewOutPath = vscode.Uri.joinPath(this._extensionUri, "src", "webview", "out");
     const htmlPath = vscode.Uri.joinPath(webviewOutPath, "index.html");
     const html = fs.readFileSync(htmlPath.fsPath, "utf8");
     const nonce = getNonce();
@@ -63,15 +60,19 @@ export class llmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
     });
 
     // Add the CSP meta tag
-    $('head').prepend(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">`);
+    $('head').prepend(`<meta 
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none';
+      style-src ${webview.cspSource};
+      script-src 'nonce-${nonce}';">`);
 
 
     return $.html();
   }
 
-  public logMessage(message: string, type: string) {
+  public logMessage(message: string, type: string, timestamp: number) {
     if (this._view) {
-      this._view.webview.postMessage({ command: "log", message, type });
+      this._view.webview.postMessage({ command: "log", message, type, timestamp });
     }
   }
 }

@@ -79,7 +79,7 @@
     "build:extension": "node esbuild.extension.js",
     "build": "npm run build:extension && npm run build:webview",
     "dev:extension": "node esbuild.extension.js --watch",
-    "dev": "concurrently \"npm run dev:extension\" \"npm run dev:webview\"",
+    "dev": "rm -rf out && concurrently \"npm run dev:extension\" \"npm run dev:webview\"",
     "update": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
     "vscode:prepublish": "tsc",

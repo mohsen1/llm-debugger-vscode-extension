@@ -156,6 +156,7 @@ export class DebugLoopController extends EventEmitter {
             const breakpoint = new vscode.SourceBreakpoint(location, true);
 
             vscode.debug.addBreakpoints([breakpoint]);
+            log.debug(`Set breakpoint at ${fullPath}:${line}`);
         } catch (err) {
             log.error(`Failed to set breakpoint: ${String(err)}`);
             vscode.window.showErrorMessage(
@@ -186,11 +187,8 @@ export class DebugLoopController extends EventEmitter {
 
             if (toRemove.length) {
                 vscode.debug.removeBreakpoints(toRemove);
-                log.info(
+                log.debug(
                     `Removed ${toRemove.length} breakpoint(s) at ${file}:${line}`,
-                );
-                vscode.window.showInformationMessage(
-                    `Removed breakpoint at ${file}:${line}`,
                 );
             }
         } catch (err) {
