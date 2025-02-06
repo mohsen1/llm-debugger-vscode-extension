@@ -307,7 +307,7 @@ export class DebugLoopController extends EventEmitter {
 
     for (const toolCall of choice.message?.tool_calls || []) {
       const { name, arguments: argsStr } = toolCall.function;
-      log.fn(`${name}(${argsStr || ""})`);
+      log.fn(`${name}(${argsStr && argsStr !== '{}' ? argsStr : ""})`);
 
       switch (name) {
         case "setBreakpoint":

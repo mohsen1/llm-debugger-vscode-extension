@@ -102,7 +102,7 @@ class Logger {
     this.clearThinkingTimeout();
     const message = msgs.join(" ");
     this.writeToOutput(message, "debug");
-    this.logToSidebar(message, "debug");
+    // not writing to sidebar because it's too verbose
   }
 
   info(...msgs: string[]) {

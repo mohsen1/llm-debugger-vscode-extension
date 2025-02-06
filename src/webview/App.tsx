@@ -2,11 +2,7 @@ import * as React from "react";
 import MarkdownIt from "markdown-it";
 import * as vscode from "vscode";
 
-declare function acquireVsCodeApi<Commands = { command: string }, State = unknown>(): {
-  postMessage(message: Commands): void;
-  setState(state: State): void;
-  getState(): State;
-};
+
 
 export function App() {
   const [logs, setLogs] = React.useState<
@@ -16,6 +12,8 @@ export function App() {
       timestamp: number;
     }[]
   >([]);
+  const [configs, setConfigs] = React.useState<vscode.DebugConfiguration[]>([]);
+  const [selectedConfig, setSelectedConfig] = React.useState<vscode.DebugConfiguration | null>(null);
 
   React.useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -28,30 +26,41 @@ export function App() {
             timestamp: event.data.timestamp,
           },
         ]);
+      } else if (event.data?.command === "initConfigs") {
+        setConfigs(event.data.configs);
+        setSelectedConfig(event.data.configs[0]);
       }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
+  // Automatically select the first config when available
+  React.useEffect(() => {
+    if (configs.length > 0 && selectedConfig === null) {
+      const firstConfig = configs[0];
+      setSelectedConfig(firstConfig);
+  
+      window.vscodeApi.postMessage({
+        command: "chooseConfig",
+        config: JSON.stringify(firstConfig),
+      });
+    }
+  }, [configs, selectedConfig]);
+
   const handleStartDebug = () => {
-    const vscode = acquireVsCodeApi();
-    vscode.postMessage({ command: "startDebugging" });
+    window.vscodeApi.postMessage({ command: 'chooseConfig', config: selectedConfig })
+    window.vscodeApi.postMessage({ command: "startDebugging" });
   };
 
- 
   const handleConfigChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const vscode = acquireVsCodeApi<{ command: "chooseConfig", config: string }>();
-    const config = e.target.value;
-    vscode.postMessage({ command: "chooseConfig", config });
+    const configName = e.target.value;
+    const config = configs.find((config) => config.name === configName);
+    if (config) {
+      setSelectedConfig(config);
+      window.vscodeApi.postMessage({ command: "chooseConfig", config: JSON.stringify(config) });
+    }
   };
-
-  const getAllConfigs = () => {
-    const vscode = acquireVsCodeApi<unknown, { configs: vscode.DebugConfiguration[] }>();
-    const configs = vscode.getState()?.configs;
-    return configs;
-  };
-
 
   const renderMarkdown = (message: string) => {
     const markdown = new MarkdownIt();
@@ -63,32 +72,35 @@ export function App() {
     );
   };
 
-
   return (
-    <div>
-      <div className="configs-list">
-        <select onChange={handleConfigChange}>
-          {getAllConfigs().map((config) => (
-            <option key={config.name} value={config.name}>{config.name}</option>
+    <div className="sidebar-container">
+      <div className="control-panel">
+        <select className="control-selector" onChange={handleConfigChange} value={selectedConfig?.name}>
+          {configs.map((config) => (
+            <option key={config.name} value={config.name}>
+              {config.name} ({config.type})
+            </option>
           ))}
         </select>
-      </div>
-      <div className="control-panel">
-        <button id="start-button" onClick={handleStartDebug}>
-          Start Debug
-        </button>
-      </div>
-      {logs.length > 0 ? (
-        <div id="log-area">
-          {logs.map((line, i) => (
-            <div key={i} className="log-message">
-              {renderMarkdown(line.message)}
-            </div>
-          ))}
+        <div>
+          <button id="start-button" onClick={handleStartDebug}>
+            <span>Start Debug</span>
+          </button>
         </div>
-      ) : (
-        <Help />
-      )}
+      </div>
+
+      {logs.length > 0
+        ? (
+          <div id="log-area">
+            {logs
+            .map((line, i) => (
+              <div key={i} className={`log-message log-${line.type} ${line.type === "ai" && i === logs.length - 1 ? "active" : ""}`}>
+                {renderMarkdown(line.message)}
+              </div>
+            ))}
+          </div>
+        )
+        : <Help />}
     </div>
   );
 }
@@ -97,8 +109,8 @@ function Help() {
   return (
     <div className="help-text">
       <p>
-        Click on the <code>Start Debug</code> button to start debugging using
-        the LLM Debugger.
+        Click on the <code>Start Debug</code>{" "}
+        button to start debugging using the LLM Debugger.
       </p>
     </div>
   );

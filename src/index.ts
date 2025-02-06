@@ -9,8 +9,6 @@ import { llmDebuggerSidebarProvider } from "./views/SidebarView";
 
 const debugLoopController = new DebugLoopController();
 
-
-
 export async function activate(context: vscode.ExtensionContext) {
   try {
     // Restore persisted logs
@@ -52,34 +50,13 @@ export async function activate(context: vscode.ExtensionContext) {
     // Command for choosing a configuration to use for debugging via UI
     const chooseConfigCommand = vscode.commands.registerCommand(
       "llm-debugger.chooseConfig",
-      async () => {
-        const configs: vscode.DebugConfiguration[] = context.workspaceState.get("llmDebuggerConfigs", []);
-        if (!configs || configs.length === 0) {
-          vscode.window.showErrorMessage(
-            "No LLM Debugger configurations available. Please run 'LLM Debugger: Set Configs' command first."
-          );
-          return;
-        }
-        const chosen = await vscode.window.showQuickPick(
-          configs.map((cfg) => ({
-            label: cfg.name || "Unnamed Config",
-            description: cfg.type,
-            config: cfg,
-          })),
-          {
-            placeHolder: "Select a configuration for LLM Debugger",
-          }
-        );
-        if (chosen && chosen.config) {
-          await context.workspaceState.update("llmDebuggerSelectedConfig", chosen.config);
-          vscode.window.showInformationMessage(`LLM Debugger selected config: ${chosen.label}`);
-        }
+      async (message: { config: string }) => {
+        const config = JSON.parse(message.config);
+        context.workspaceState.update("llmDebuggerSelectedConfig", config);
       }
     );
 
-    const sidebarProvider = new llmDebuggerSidebarProvider(
-      context.extensionUri,
-    );
+    const sidebarProvider = new llmDebuggerSidebarProvider(context);
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(
         "llmDebuggerSidebar.view",
@@ -105,7 +82,12 @@ export async function activate(context: vscode.ExtensionContext) {
     }
     log.info("Workspace", workspace.uri.fsPath);
     const configs = getLaunchConfigs(workspace);
-    log.info("All configs", JSON.stringify(configs, null, 2));
+
+
+    // Add this line to store configs in workspace state
+    await context.workspaceState.update("llmDebuggerConfigs", configs);
+    await context.workspaceState.update("llmDebuggerSelectedConfig", configs[0]);
+
 
     // Register debug tracker so we can handle events like "stopped"
     vscode.debug.registerDebugAdapterTrackerFactory("*", {

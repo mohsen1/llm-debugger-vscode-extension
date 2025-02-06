@@ -1,68 +1,103 @@
 body {
-  padding: 10px;
   font-family: var(--vscode-font-family);
+}
+.global-error {
+  max-width: 100%;
+}
+.global-error h1 {
+  font-weight: 400;
+  margin-bottom: 10px;
+}
+.global-error pre {
+  border: 1px solid var(--vscode-input-border);
+  padding: 4px;
+  margin: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-all;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.sidebar-container {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
 }
 
 .control-panel {
   display: grid;
-  place-content: start;
+  gap: 4px;
+  grid-template-columns: 1fr auto;
+}
+
+.control-selector {
+  height: 24px;
+  border: 1px solid var(--vscode-input-border);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
 }
 
 #start-button {
-  width: 100%;
-  max-width: 200px;
   padding: 8px;
-  margin-bottom: 16px;
+  height: 24px;
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
   border: none;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #start-button:hover {
   background: var(--vscode-button-hoverBackground);
 }
 #log-area {
-  height: calc(100vh - 120px);
   overflow-y: auto;
-  border: 1px solid var(--vscode-input-border);
-  padding: 8px;
 }
 .log-message {
-  margin: 4px 0;
-  padding: 4px;
-  border-radius: 4px;
-  white-space: pre-wrap;
-  display: flex;
-  flex-direction: column;
-  /* reverse order so its always the latest logs at the bottom */
-  flex-direction: column-reverse;
+  margin-bottom: 2px;
+  padding: 0 2px;
 }
 .log-ai {
   color: var(--vscode-debugTokenExpression-name);
 }
+
+@keyframes ellipsis {
+  0% { content: "..."; }
+  50% { content: ".."; }
+  100% { content: "."; }
+}
+
+.log-ai.active::after {
+  content: "...";
+  display: inline-block;
+  /* animate the ellipsis */
+  animation: ellipsis 1.5s infinite;
+}
+
 .log-fn {
-  color: var(--vscode-debugTokenExpression-value);
+  font-family: var(--vscode-editor-font-family);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+}
+.log-fn .markdown-content p {
+  display: inline-block;
+  margin: 2px;
 }
 .log-debug {
   color: var(--vscode-debugIcon-breakpointCurrentStackframeForeground);
 }
 .log-info {
-  color: var(--vscode-debugConsole-infoForeground);
+  color: var(--vscode-font-family);
 }
 .log-error {
   color: var(--vscode-debugConsole-errorForeground);
 }
 .log-warn {
   color: var(--vscode-debugConsole-warningForeground);
-}
-.function-call {
-  font-family: var(--vscode-editor-font-family);
-  background: var(--vscode-editor-background);
-  padding: 6px;
-  border: 1px solid var(--vscode-input-border);
-  border-radius: 4px;
-  display: block;
 }
 .markdown-content code {
   font-family: var(--vscode-editor-font-family);
