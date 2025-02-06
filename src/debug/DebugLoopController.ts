@@ -7,11 +7,11 @@ import {
     ChatWithHistory,
     debugFunctions,
     debugLoopSystemMessage,
-} from "./chatTools";
-import log from "./log";
-import { getInitialBreakpointsMessage, getPausedMessage } from "./prompts";
-import { gatherPausedState } from "./state";
-import { StructuredCode } from "./types";
+} from "../ai/chatTools";
+import log from "../logger";
+import { getInitialBreakpointsMessage, getPausedMessage } from "../ai/prompts";
+import { DebugState } from "./DebugState";
+import { StructuredCode } from "../types";
 import { EventEmitter } from "node:events";
 
 /**
@@ -78,7 +78,8 @@ export class DebugLoopController extends EventEmitter {
         if (!this.session) return;
         if (!this.live) return;
 
-        const pausedState = await gatherPausedState(this.session);
+        const debugState = new DebugState();
+        const pausedState = await debugState.gatherPausedState(this.session);
 
         if (this.finishing) return;
         if (!this.live) return;

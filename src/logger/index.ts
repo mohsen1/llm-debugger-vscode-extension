@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { llmDebuggerSidebarProvider } from "./SidebarView";
+import { llmDebuggerSidebarProvider } from "../views/SidebarView";
 
 export interface LogEntry {
     message: string;

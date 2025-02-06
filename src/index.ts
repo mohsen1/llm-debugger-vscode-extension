@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
-import { DebugLoopController } from "./DebugLoopController";
-import { DebugAdapterTracker } from "./DebugAdapterTracker";
-import { gatherWorkspaceCode } from "./codeParser";
-import log from "./log";
-// import { llmDebuggerSidebarProvider } from "./SidebarView";
-import type { LogEntry } from "./log";
-import { llmDebuggerSidebarProvider } from "./SidebarView";
+import { DebugLoopController } from "./debug/DebugLoopController";
+import { DebugAdapterTracker } from "./debug/DebugAdapterTracker";
+import { gatherWorkspaceCode } from "./utils";
+import log from "./logger";
+
+import type { LogEntry } from "./logger";
+import { llmDebuggerSidebarProvider } from "./views/SidebarView";
 
 const debugLoopController = new DebugLoopController();
 

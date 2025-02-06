@@ -1,5 +1,5 @@
 import type { ChatCompletionSystemMessageParam } from "openai/resources";
-import type {  StructuredCode } from "./types";
+import type { StructuredCode } from "../types";
 
 export const systemMessage: ChatCompletionSystemMessageParam = {
   role: "system",
