@@ -5,7 +5,7 @@ import { gatherWorkspaceCode, getLaunchConfigs } from "./utils";
 import log from "./logger";
 
 import type { LogEntry } from "./logger";
-import { llmDebuggerSidebarProvider } from "./views/SidebarView";
+import { LlmDebuggerSidebarProvider } from "./views/SidebarView";
 
 const debugLoopController = new DebugLoopController();
 
@@ -56,10 +56,10 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     );
 
-    const sidebarProvider = new llmDebuggerSidebarProvider(context);
+    const sidebarProvider = new LlmDebuggerSidebarProvider(context);
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(
-        "llmDebuggerSidebar.view",
+        "llmDebuggerPanel",
         sidebarProvider,
         {
           webviewOptions: {

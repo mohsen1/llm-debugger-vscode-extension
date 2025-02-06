@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { llmDebuggerSidebarProvider } from "../views/SidebarView";
+import { LlmDebuggerSidebarProvider } from "../views/SidebarView";
 
 export interface LogEntry {
   message: string;
@@ -10,7 +10,7 @@ export interface LogEntry {
 class Logger {
   private logChannel: vscode.LogOutputChannel;
   private thinkingTimeout: NodeJS.Timeout | null = null;
-  private sidebarProvider: llmDebuggerSidebarProvider | null = null;
+  private sidebarProvider: LlmDebuggerSidebarProvider | null = null;
   private logEntries: LogEntry[] = [];
 
   constructor() {
@@ -19,7 +19,7 @@ class Logger {
     });
   }
 
-  setSidebarProvider(provider: llmDebuggerSidebarProvider) {
+  setSidebarProvider(provider: LlmDebuggerSidebarProvider) {
     this.sidebarProvider = provider;
     // Replay existing logs to the new provider
     this.logEntries.forEach((entry) => {

@@ -2,9 +2,9 @@ import * as crypto from "crypto";
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as cheerio from "cheerio";
-import log from "../logger";
 
-export class llmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
+
+export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private readonly _extensionContext: vscode.ExtensionContext;
   private readonly _extensionUri: vscode.Uri;

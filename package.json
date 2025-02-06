@@ -44,20 +44,19 @@
       }
     ],
     "viewsContainers": {
-      "activitybar": [
+      "debug": [
         {
           "id": "llmDebuggerSidebar",
-          "title": "LLM Debugger",
-          "icon": "$(rocket)"
+          "title": "LLM Debugger"
         }
       ]
     },
     "views": {
-      "llmDebuggerSidebar": [
+      "debug": [
         {
-          "type": "webview",
-          "id": "llmDebuggerSidebar.view",
-          "name": "LLM Debugger"
+          "id": "llmDebuggerPanel",
+          "name": "LLM Debugger",
+          "type": "webview"
         }
       ]
     },
