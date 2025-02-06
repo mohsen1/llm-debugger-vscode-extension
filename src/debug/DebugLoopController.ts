@@ -1,18 +1,12 @@
+import { EventEmitter } from "node:events";
 import * as path from "node:path";
 import type { ChatCompletion } from "openai/resources";
 import * as vscode from "vscode";
-import {
-    breakpointFunctions,
-    callLlm,
-    ChatWithHistory,
-    debugFunctions,
-    debugLoopSystemMessage,
-} from "../ai/chatTools";
+import { breakpointFunctions, debugFunctions, getInitialBreakpointsMessage, getPausedMessage, systemMessage } from "../ai/prompts";
+import { AIChat, callLlm } from "../ai/Chat";
 import log from "../logger";
-import { getInitialBreakpointsMessage, getPausedMessage } from "../ai/prompts";
-import { DebugState } from "./DebugState";
 import { StructuredCode } from "../types";
-import { EventEmitter } from "node:events";
+import { DebugState } from "./DebugState";
 
 /**
  * This controller waits for "stopped" events to retrieve paused state.
@@ -23,7 +17,7 @@ export class DebugLoopController extends EventEmitter {
     private live = false;
     private finishing = false;
     private session: vscode.DebugSession | null = null;
-    private chatWithHistory = new ChatWithHistory(debugLoopSystemMessage, [
+    private chatWithHistory = new AIChat(systemMessage, [
         ...breakpointFunctions,
         ...debugFunctions,
     ]);

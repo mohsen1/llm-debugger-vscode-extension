@@ -1,4 +1,4 @@
-import type { ChatCompletionSystemMessageParam } from "openai/resources";
+import type { ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool } from "openai/resources";
 import type { StructuredCode } from "../types";
 
 export const systemMessage: ChatCompletionSystemMessageParam = {
@@ -64,3 +64,81 @@ export function serializeStructuredCode(structuredCode: StructuredCode[]) {
 
   return serialized;
 }
+
+
+export const initialBreakPointsSystemMessage: ChatCompletionMessageParam = {
+  role: "system" as const,
+  content:
+    "You are an AI assistant that sets initial breakpoints before launch of a debugger.",
+};
+
+export const debugLoopSystemMessage: ChatCompletionMessageParam = {
+  role: "system" as const,
+  content:
+    "You are an AI assistant that decides debugging steps. suggest next action by calling a function",
+};
+
+export const breakpointFunctions: ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "setBreakpoint",
+      description: "Sets a breakpoint in a specific file and line.",
+      parameters: {
+        type: "object",
+        properties: {
+          file: { type: "string" },
+          line: { type: "number" },
+        },
+        required: ["file", "line"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "removeBreakpoint",
+      description: "Removes a breakpoint from a specific file and line.",
+      parameters: {
+        type: "object",
+        properties: { file: { type: "string" }, line: { type: "number" } },
+        required: ["file", "line"],
+      },
+    },
+  },
+];
+
+export const debugFunctions: ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "next",
+      description: "Step over the current line in the debugger.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stepIn",
+      description: "Step into the current function call in the debugger.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stepOut",
+      description: "Step out of the current function call in the debugger.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "continue",
+      description: "Continue execution in the debugger.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+];
