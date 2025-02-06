@@ -1,17 +1,16 @@
-
 {
-    "name": "llm-debugger-webview",
-    "version": "0.0.1",
-    "description": "LLM Debugger Webview",
-    "scripts": {
-      "build": "parcel build index.html --dist-dir out --cache-dir .parcel-cache",
-      "dev": "parcel watch index.html --dist-dir out --cache-dir .parcel-cache"
-    },
-    "dependencies": {
-      "react": "^18.2.0",
-      "react-dom": "^18.2.0"
-    },
-    "devDependencies": {
-      "parcel": "^2.13.3"
-    }
+  "name": "llm-debugger-webview",
+  "version": "0.0.1",
+  "description": "LLM Debugger Webview",
+  "scripts": {
+    "build": "parcel build index.html --dist-dir out --cache-dir .parcel-cache",
+    "dev": "parcel watch index.html --dist-dir out --cache-dir .parcel-cache"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "parcel": "^2.13.3"
   }
+}

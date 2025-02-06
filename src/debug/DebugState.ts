@@ -12,7 +12,10 @@ interface SimpleBreakpoint {
 export interface PausedState {
   breakpoints: SimpleBreakpoint[];
   pausedStack: StackFrame[];
-  topFrameVariables: { scopeName: string; variables: { name: string; value: string }[] }[];
+  topFrameVariables: {
+    scopeName: string;
+    variables: { name: string; value: string }[];
+  }[];
 }
 
 export class DebugState {

@@ -14,7 +14,13 @@
     "declaration": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "out", "esbuild.extension.js", "src/webview/esbuild.webview.js", "src/webview/**/*"],
+  "exclude": [
+    "node_modules",
+    "out",
+    "esbuild.extension.js",
+    "src/webview/esbuild.webview.js",
+    "src/webview/**/*"
+  ],
   "references": [
     {
       "path": "./src/webview"

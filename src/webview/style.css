@@ -1,72 +1,72 @@
 body {
-    padding: 10px;
-    font-family: var(--vscode-font-family);
+  padding: 10px;
+  font-family: var(--vscode-font-family);
 }
 
 .control-panel {
-    display: grid;
-    place-content: start;
+  display: grid;
+  place-content: start;
 }
 
 #start-button {
-    width: 100%;
-    max-width: 200px;
-    padding: 8px;
-    margin-bottom: 16px;
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border: none;
-    cursor: pointer;
+  width: 100%;
+  max-width: 200px;
+  padding: 8px;
+  margin-bottom: 16px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  cursor: pointer;
 }
 
 #start-button:hover {
-    background: var(--vscode-button-hoverBackground);
+  background: var(--vscode-button-hoverBackground);
 }
 #log-area {
-    height: calc(100vh - 120px);
-    overflow-y: auto;
-    border: 1px solid var(--vscode-input-border);
-    padding: 8px;
+  height: calc(100vh - 120px);
+  overflow-y: auto;
+  border: 1px solid var(--vscode-input-border);
+  padding: 8px;
 }
 .log-message {
-    margin: 4px 0;
-    padding: 4px;
-    border-radius: 4px;
-    white-space: pre-wrap;
-    display: flex;
-    flex-direction: column;
-    /* reverse order so its always the latest logs at the bottom */
-    flex-direction: column-reverse;
+  margin: 4px 0;
+  padding: 4px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  display: flex;
+  flex-direction: column;
+  /* reverse order so its always the latest logs at the bottom */
+  flex-direction: column-reverse;
 }
 .log-ai {
-    color: var(--vscode-debugTokenExpression-name);
+  color: var(--vscode-debugTokenExpression-name);
 }
 .log-fn {
-    color: var(--vscode-debugTokenExpression-value);
+  color: var(--vscode-debugTokenExpression-value);
 }
 .log-debug {
-    color: var(--vscode-debugIcon-breakpointCurrentStackframeForeground);
+  color: var(--vscode-debugIcon-breakpointCurrentStackframeForeground);
 }
 .log-info {
-    color: var(--vscode-debugConsole-infoForeground);
+  color: var(--vscode-debugConsole-infoForeground);
 }
 .log-error {
-    color: var(--vscode-debugConsole-errorForeground);
+  color: var(--vscode-debugConsole-errorForeground);
 }
 .log-warn {
-    color: var(--vscode-debugConsole-warningForeground);
+  color: var(--vscode-debugConsole-warningForeground);
 }
 .function-call {
-    font-family: var(--vscode-editor-font-family);
-    background: var(--vscode-editor-background);
-    padding: 6px;
-    border: 1px solid var(--vscode-input-border);
-    border-radius: 4px;
-    display: block;
+  font-family: var(--vscode-editor-font-family);
+  background: var(--vscode-editor-background);
+  padding: 6px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  display: block;
 }
 .markdown-content code {
-    font-family: var(--vscode-editor-font-family);
-    background: var(--vscode-editor-background);
-    padding: 2px 4px;
-    border-radius: 3px;
+  font-family: var(--vscode-editor-font-family);
+  background: var(--vscode-editor-background);
+  padding: 2px 4px;
+  border-radius: 3px;
 }

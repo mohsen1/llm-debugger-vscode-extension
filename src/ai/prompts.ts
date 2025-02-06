@@ -1,4 +1,8 @@
-import type { ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionTool } from "openai/resources";
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionSystemMessageParam,
+  ChatCompletionTool,
+} from "openai/resources";
 import type { StructuredCode } from "../types";
 
 export const systemMessage: ChatCompletionSystemMessageParam = {
@@ -20,19 +24,12 @@ export function getInitialBreakpointsMessage(
 
 export function getPausedMessage(
   structuredCode: StructuredCode[],
-  pausedState: unknown
+  pausedState: unknown,
 ): string {
-  const message = [
-    "# Code:",
-    serializeStructuredCode(structuredCode),
-    "",
-  ];
+  const message = ["# Code:", serializeStructuredCode(structuredCode), ""];
 
   if (pausedState) {
-    message.push(
-      "# Current Debug State:",
-      JSON.stringify(pausedState)
-    );
+    message.push("# Current Debug State:", JSON.stringify(pausedState));
   }
 
   message.push(
@@ -46,25 +43,21 @@ export function getPausedMessage(
   return message.join("\n");
 }
 
-
 export function serializeStructuredCode(structuredCode: StructuredCode[]) {
   const serialized = structuredCode
     .map(
       ({ filePath, lines }) =>
-        `${filePath}\n${
-          lines
-            .map(
-              ({ lineNumber, text }) =>
-                `${String(lineNumber).padStart(3, " ")}| ${text}`,
-            )
-            .join("\n")
-        }`,
+        `${filePath}\n${lines
+          .map(
+            ({ lineNumber, text }) =>
+              `${String(lineNumber).padStart(3, " ")}| ${text}`,
+          )
+          .join("\n")}`,
     )
     .join("\n\n");
 
   return serialized;
 }
-
 
 export const initialBreakPointsSystemMessage: ChatCompletionMessageParam = {
   role: "system" as const,

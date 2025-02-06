@@ -16,7 +16,7 @@ export class llmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [
         // Allow access to the 'src/webview/out' directory.
-        vscode.Uri.joinPath(this._extensionUri, "src", "webview", "out")
+        vscode.Uri.joinPath(this._extensionUri, "src", "webview", "out"),
       ],
     };
 
@@ -34,17 +34,24 @@ export class llmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtmlForWebview(webview: vscode.Webview): string {
-    const webviewOutPath = vscode.Uri.joinPath(this._extensionUri, "src", "webview", "out");
+    const webviewOutPath = vscode.Uri.joinPath(
+      this._extensionUri,
+      "src",
+      "webview",
+      "out",
+    );
     const htmlPath = vscode.Uri.joinPath(webviewOutPath, "index.html");
     const html = fs.readFileSync(htmlPath.fsPath, "utf8");
     const nonce = getNonce();
     const $ = cheerio.load(html);
 
     // Resolve HTML imports of CSS files using cheerio
-     $("link[rel='stylesheet']").each((i, el) => {
+    $("link[rel='stylesheet']").each((i, el) => {
       const relativeHref = $(el).attr("href");
       if (relativeHref) {
-        const newHref = webview.asWebviewUri(vscode.Uri.joinPath(webviewOutPath, relativeHref)).toString();
+        const newHref = webview
+          .asWebviewUri(vscode.Uri.joinPath(webviewOutPath, relativeHref))
+          .toString();
         $(el).attr("href", newHref);
       }
     });
@@ -53,30 +60,36 @@ export class llmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
     $("script").each((i, el) => {
       const relativeSrc = $(el).attr("src");
       if (relativeSrc) {
-        const newSrc = webview.asWebviewUri(vscode.Uri.joinPath(webviewOutPath, relativeSrc)).toString();
+        const newSrc = webview
+          .asWebviewUri(vscode.Uri.joinPath(webviewOutPath, relativeSrc))
+          .toString();
         $(el).attr("src", newSrc);
         $(el).attr("nonce", nonce);
       }
     });
 
     // Add the CSP meta tag
-    $('head').prepend(`<meta 
+    $("head").prepend(`<meta 
       http-equiv="Content-Security-Policy"
       content="default-src 'none';
       style-src ${webview.cspSource};
       script-src 'nonce-${nonce}';">`);
-
 
     return $.html();
   }
 
   public logMessage(message: string, type: string, timestamp: number) {
     if (this._view) {
-      this._view.webview.postMessage({ command: "log", message, type, timestamp });
+      this._view.webview.postMessage({
+        command: "log",
+        message,
+        type,
+        timestamp,
+      });
     }
   }
 }
 
 function getNonce() {
-  return crypto.randomBytes(16).toString('base64'); // Cryptographically secure nonce
+  return crypto.randomBytes(16).toString("base64"); // Cryptographically secure nonce
 }

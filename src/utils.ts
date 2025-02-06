@@ -22,3 +22,10 @@ export function gatherWorkspaceCode(): StructuredCode[] {
       })),
   }));
 }
+
+
+export function getLaunchConfigs(workspace: vscode.WorkspaceFolder): vscode.DebugConfiguration[] {
+  const config = vscode.workspace.getConfiguration("launch", workspace);
+  const configurations = config.get<vscode.DebugConfiguration[]>("configurations");
+  return configurations ?? [];
+}
