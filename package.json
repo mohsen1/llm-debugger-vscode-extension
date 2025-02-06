@@ -32,8 +32,7 @@
     "vscode": "^1.96.0"
   },
   "activationEvents": [
-    "onDebugResolve:node",
-    "onView:llmDebuggerSidebar.view"
+    "*"
   ],
   "contributes": {
     "debuggers": [
@@ -72,8 +71,12 @@
     }
   },
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --outdir=out --format=cjs --sourcemap --external:vscode --external:@vscode/* --minify=false --keep-names",
-    "dev": "pnpm build --watch",
+    "build:extension": "node esbuild.extension.js",
+    "build:webview": "node esbuild.webview.js",
+    "build": "npm run build:extension && npm run build:webview",
+    "dev:extension": "node esbuild.extension.js --watch",
+    "dev:webview": "node src/webview/esbuild.webview.js --watch",
+    "dev": "concurrently \"npm run dev:extension\" \"npm run dev:webview\"",
     "update": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
     "vscode:prepublish": "tsc",
@@ -85,14 +88,17 @@
   },
   "dependencies": {
     "@vscode/debugadapter": "^1.68.0",
-    "chalk": "^5.4.1",
-    "openai": "^4.82.0"
+    "markdown-it": "^14.1.0",
+    "openai": "^4.82.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.4.1",
     "@types/vscode": "1.96.0",
     "@vscode/vsce": "^3.0.0",
     "bumpp": "^9.5.1",
+    "concurrently": "^8.2.0",
     "esbuild": "^0.24.2",
     "eslint": "^9.19.0",
     "reactive-vscode": "^0.2.0",
@@ -100,6 +106,8 @@
     "typescript-eslint": "^8.23.0",
     "vite": "^5.4.1",
     "vitest": "^2.0.5",
-    "vscode-ext-gen": "^0.4.1"
+    "vscode-ext-gen": "^0.4.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
   }
 }

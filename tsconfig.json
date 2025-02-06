@@ -1,19 +1,23 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "lib": ["esnext"],
-    "rootDir": ".",
+    "target": "ES2020",
+    "lib": ["ESNext"],
+    "rootDir": "src",
     "module": "ESNext",
     "moduleResolution": "Node",
-    "types": ["vscode", "node", "vitest", "openai"],
+    "types": ["vscode", "node"],
     "strict": true,
     "outDir": "out",
-    "sourceMap": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noImplicitAny": false,
-    "resolveJsonModule": true
+    "composite": true,
+    "declaration": true
   },
-  "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules", ".vscode-test", "out"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "out", "esbuild.extension.js", "src/webview/esbuild.webview.js", "src/webview/**/*"],
+  "references": [
+    {
+      "path": "./src/webview"
+    }
+  ]
 }

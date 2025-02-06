@@ -3,21 +3,23 @@ import { DebugLoopController } from "./DebugLoopController";
 import { DebugAdapterTracker } from "./DebugAdapterTracker";
 import { gatherWorkspaceCode } from "./codeParser";
 import log from "./log";
+// import { llmDebuggerSidebarProvider } from "./SidebarView";
+import type { LogEntry } from "./log";
 import { llmDebuggerSidebarProvider } from "./SidebarView";
 
 const debugLoopController = new DebugLoopController();
 
 export async function activate(context: vscode.ExtensionContext) {
-  // Register debug tracker so we can handle events like "stopped"
-  vscode.debug.registerDebugAdapterTrackerFactory("*", {
-    createDebugAdapterTracker(session) {
-      return new DebugAdapterTracker(session, debugLoopController);
-    },
-  });
-
+  
+  try {
+    // Restore persisted logs
+    const storedLogs = context.workspaceState.get<LogEntry[]>("llmDebuggerLogs", []);
+    
+  // Register debug command
   const startCommand = vscode.commands.registerCommand(
     "llm-debugger.startLLMDebug",
     async () => {
+
       log.show();
       debugLoopController.reset();
       await debugLoopController.setInitialBreakpoints();
@@ -31,15 +33,38 @@ export async function activate(context: vscode.ExtensionContext) {
         stopOnEntry: true,
         program: "${workspaceFolder}/array.test.js",
         env: { NODE_ENV: "test" },
+        internalConsoleOptions: "neverOpen",
+        openDebug: "neverOpen"
       });
       log.show()
     },
   );
-
-  context.subscriptions.push(startCommand);
-
-  const sidebarProvider = new llmDebuggerSidebarProvider();
+  const sidebarProvider = new llmDebuggerSidebarProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("llmDebuggerSidebar.view", sidebarProvider)
   );
+
+  // Set up logger with restored logs
+  log.setSidebarProvider(sidebarProvider);
+  log.loadPersistedLogs(storedLogs);
+
+  log.debug("Activated");
+
+  // Register debug tracker so we can handle events like "stopped"
+  vscode.debug.registerDebugAdapterTrackerFactory("*", {
+    createDebugAdapterTracker(session) {
+      return new DebugAdapterTracker(session, debugLoopController);
+    },
+  });
+
+
+  // Save logs when debug session ends
+  debugLoopController.on("finished", () => {
+      context.workspaceState.update("llmDebuggerLogs", log.getPersistedLogs());
+    });
+
+    context.subscriptions.push(startCommand);
+  } catch (error) {
+    log.error("Failed to activate", String(error));
+  }
 }

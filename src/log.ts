@@ -1,64 +1,114 @@
 import * as vscode from "vscode";
-import chalk from "chalk";
+import { llmDebuggerSidebarProvider } from "./SidebarView";
+
+export interface LogEntry {
+    message: string;
+    type: string;
+    timestamp: number;
+}
 
 class Logger {
-  private outputChannel: vscode.OutputChannel;
-  private thinkingTimeout: NodeJS.Timeout | null = null;
+    private logChannel: vscode.LogOutputChannel;
+    private thinkingTimeout: NodeJS.Timeout | null = null;
+    private sidebarProvider: llmDebuggerSidebarProvider | null = null;
+    private logEntries: LogEntry[] = [];
 
-  constructor() {
-    this.outputChannel = vscode.window.createOutputChannel("LLM Debugger");
-  }
-
-  private clearThinkingTimeout() {
-    if (this.thinkingTimeout) {
-      clearInterval(this.thinkingTimeout);
-      this.thinkingTimeout = null;
-      this.outputChannel.appendLine("");
+    constructor() {
+        this.logChannel = vscode.window.createOutputChannel("LLM Debugger", { log: true });
     }
-  }
 
-  show() {
-    this.outputChannel.show();
-  }
-
-  clear() {
-    this.clearThinkingTimeout();
-    this.outputChannel.clear();
-  }
-
-  ai(...msgs: string[]) {
-    this.outputChannel.appendLine(chalk.blue(`AI: `) + msgs.join(" "));
-    if (!this.thinkingTimeout) {
-      this.thinkingTimeout = setInterval(() => {
-        this.outputChannel.append('🁢');
-      }, 250);
+    setSidebarProvider(provider: llmDebuggerSidebarProvider) {
+        this.sidebarProvider = provider;
+        // Replay existing logs to the new provider
+        this.logEntries.forEach(entry => {
+            this.sidebarProvider?.logMessage(entry.message, entry.type);
+        });
     }
-  }
 
-  fn(...msgs: string[]) {
-    this.clearThinkingTimeout();
-    this.outputChannel.appendLine(chalk.green(`FN: `) + msgs.join(" "));
-  }
+    loadPersistedLogs(entries: LogEntry[]) {
+        this.logEntries = entries;
+        // Replay logs to sidebar if provider exists
+        if (this.sidebarProvider) {
+            entries.forEach(entry => {
+                this.sidebarProvider?.logMessage(entry.message, entry.type);
+            });
+        }
+    }
 
-  debug(...msgs: string[]) {
-    this.clearThinkingTimeout();
-    this.outputChannel.appendLine(chalk.gray(`DEBUG: `) + msgs.join(" "));
-  }
+    getPersistedLogs(): LogEntry[] {
+        return this.logEntries;
+    }
 
-  info(...msgs: string[]) { 
-    this.clearThinkingTimeout();
-    this.outputChannel.appendLine(chalk.cyan(`INFO: `) + msgs.join(" "));
-  }
+    private clearThinkingTimeout() {
+        if (this.thinkingTimeout) {
+            clearInterval(this.thinkingTimeout);
+            this.thinkingTimeout = null;
+            this.logChannel.append("");
+        }
+    }
 
-  error(...msgs: string[]) {
-    this.clearThinkingTimeout();
-    this.outputChannel.appendLine(chalk.red(`ERROR: `) + msgs.join(" "));
-  }
+    show() {
+        this.logChannel.show();
+    }
 
-  warn(...msgs: string[]) {
-    this.clearThinkingTimeout();
-    this.outputChannel.appendLine(chalk.yellow(`WARN: `) + msgs.join(" "));
-  }
+    clear() {
+        this.clearThinkingTimeout();
+        this.logChannel.clear();
+        // Don't clear logEntries to maintain persistence
+    }
+
+    private logToSidebar(message: string, type: string) {
+        const entry = { 
+            message, 
+            type, 
+            timestamp: Date.now() 
+        };
+        this.logEntries.push(entry);
+        this.sidebarProvider?.logMessage(message, type);
+    }
+
+    private writeToOutput(msg: string, level: keyof Pick<vscode.LogOutputChannel, 'debug' | 'error' | 'info' | 'warn' | 'trace'> = 'info') {
+        this.logChannel[level](msg);
+    }
+
+    ai(...msgs: string[]) {
+        this.info('AI: ' + msgs.join(" "));
+    }
+
+    fn(...msgs: string[]) {
+        this.clearThinkingTimeout();
+        const message = msgs.join(" ");
+        this.writeToOutput(message, 'debug');
+        this.logToSidebar(message, "fn");
+    }
+
+    debug(...msgs: string[]) {
+        this.clearThinkingTimeout();
+        const message = msgs.join(" ");
+        this.writeToOutput(message, 'debug');
+        this.logToSidebar(message, "debug");
+    }
+
+    info(...msgs: string[]) {
+        this.clearThinkingTimeout();
+        const message = msgs.join(" ");
+        this.writeToOutput(message, 'info');
+        this.logToSidebar(message, "info");
+    }
+
+    error(...msgs: string[]) {
+        this.clearThinkingTimeout();
+        const message = msgs.join(" ");
+        this.writeToOutput(message, 'error');
+        this.logToSidebar(message, "error");
+    }
+
+    warn(...msgs: string[]) {
+        this.clearThinkingTimeout();
+        const message = msgs.join(" ");
+        this.writeToOutput(message, 'warn');
+        this.logToSidebar(message, "warn");
+    }
 }
 
 export default new Logger();

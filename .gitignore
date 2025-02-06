@@ -13,3 +13,4 @@ temp
 src/generated
 package/
 out/
+**/*.tsbuildinfo
