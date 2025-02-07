@@ -16,6 +16,9 @@ export class DebugAdapterTracker implements vscode.DebugAdapterTracker {
 
   async onWillStartSession(): Promise<void> {
     log.debug("onWillStartSession");
+    if (vscode.debug.activeDebugSession) {
+      await vscode.debug.activeDebugSession.customRequest("pause");
+    }
     await this.controller.waitForThreadStopped();
   }
 

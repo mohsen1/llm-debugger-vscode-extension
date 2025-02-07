@@ -144,8 +144,7 @@ export class DebugLoopController extends EventEmitter {
     this.live = false;
   }
 
-  async pauseExecution() {
-    const session = vscode.debug.activeDebugSession;
+  async pauseExecution(session: vscode.DebugSession) {
     if (!session) {
       log.debug("Cannot pause. No active debug session.");
       return;
