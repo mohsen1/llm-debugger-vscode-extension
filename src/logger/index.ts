@@ -63,7 +63,7 @@ class Logger {
 
   clear() {
     this.clearThinkingTimeout();
-    this.logChannel.clear();
+    this.logChannel.replace("");
     // Don't clear logEntries to maintain persistence
   }
 

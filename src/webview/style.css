@@ -55,6 +55,7 @@ body {
 }
 #log-area {
   overflow-y: auto;
+  padding: 4px 0;
 }
 .log-message {
   margin-bottom: 2px;
@@ -104,4 +105,28 @@ body {
   background: var(--vscode-editor-background);
   padding: 2px 4px;
   border-radius: 3px;
+}
+
+
+.help-text {
+  opacity: 0.8;
+}
+
+.spinner {
+  border: 2px solid var(--vscode-button-background);
+  border-top: 2px solid var(--vscode-button-foreground);
+  border-radius: 50%;
+  margin: 2px 4px;
+  width: 14px;
+  height: 14px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }

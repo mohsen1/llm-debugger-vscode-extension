@@ -1,96 +1,83 @@
 import * as React from "react";
 import MarkdownIt from "markdown-it";
-import * as vscode from "vscode";
 
-
+// Assume the VS Code API has been injected via the preload script
+declare const vscodeApi: {
+  postMessage(message: { command: string; enabled: boolean }): void;
+};
 
 export function App() {
   const [logs, setLogs] = React.useState<
-    {
-      message: string;
-      type: string;
-      timestamp: number;
-    }[]
+    { message: string; type: string; timestamp: number }[]
   >([]);
-  const [configs, setConfigs] = React.useState<vscode.DebugConfiguration[]>([]);
-  const [selectedConfig, setSelectedConfig] = React.useState<vscode.DebugConfiguration | null>(null);
+  const [debugEnabled, setDebugEnabled] = React.useState<boolean>(false);
 
+  const [spinnerActive, setSpinnerActive] = React.useState<boolean>(false);
   React.useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.command === "log") {
-        setLogs((prev) => [
-          ...prev,
-          {
-            message: event.data.message,
-            type: event.data.type,
-            timestamp: event.data.timestamp,
-          },
-        ]);
-      } else if (event.data?.command === "initConfigs") {
-        setConfigs(event.data.configs);
-        setSelectedConfig(event.data.configs[0]);
+      const data = event.data;
+      switch (data?.command) {
+        case "log":
+          setLogs((prev) => [...prev, {
+            message: data.message,
+            type: data.type,
+            timestamp: data.timestamp,
+          }]);
+          break;
+        case "setDebugEnabled":
+          setDebugEnabled(data.enabled);
+          break;
+        case "spinner":
+          setSpinnerActive(data.active);
+          break;
       }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  // Automatically select the first config when available
-  React.useEffect(() => {
-    if (configs.length > 0 && selectedConfig === null) {
-      const firstConfig = configs[0];
-      setSelectedConfig(firstConfig);
-  
-      window.vscodeApi.postMessage({
-        command: "chooseConfig",
-        config: JSON.stringify(firstConfig),
-      });
-    }
-  }, [configs, selectedConfig]);
-
-  // const handleStartDebug = () => {
-  //   window.vscodeApi.postMessage({ command: 'chooseConfig', config: selectedConfig })
-  //   window.vscodeApi.postMessage({ command: "startDebugging" });
-  // };
-
-  // const handleConfigChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-  //   const configName = e.target.value;
-  //   const config = configs.find((config) => config.name === configName);
-  //   if (config) {
-  //     setSelectedConfig(config);
-  //     window.vscodeApi.postMessage({ command: "chooseConfig", config: JSON.stringify(config) });
-  //   }
-  // };
+  const onCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const enabled = e.target.checked;
+    setDebugEnabled(enabled);
+    vscodeApi.postMessage({ command: "toggleDebug", enabled });
+  };
 
   const renderMarkdown = (message: string) => {
-    const markdown = new MarkdownIt();
+    const md = new MarkdownIt();
     return (
       <div
         className="markdown-content"
-        dangerouslySetInnerHTML={{ __html: markdown.render(message) }}
+        dangerouslySetInnerHTML={{ __html: md.render(message) }}
       />
     );
   };
 
+  const lastLog = logs.at(-1);
+
   return (
     <div className="sidebar-container">
       <div className="control-panel">
-        <input type="checkbox" id="debug-with-ai" />
+        <input
+          type="checkbox"
+          id="debug-with-ai"
+          checked={debugEnabled}
+          onChange={onCheckboxChange}
+        />
         <label htmlFor="debug-with-ai">Debug with AI</label>
       </div>
 
-      {logs.length > 0
-        ? (
-          <div id="log-area">
-            {logs
-            .map((line, i) => (
-              <div key={i} className={`log-message log-${line.type} ${line.type === "ai" && i === logs.length - 1 ? "active" : ""}`}>
-                {renderMarkdown(line.message)}
-              </div>
-            ))}
-          </div>
-        )
-        : <Help />}
+      <div id="log-area">
+        <div
+          className={`log-message log-${lastLog?.type} ${
+            lastLog?.type === "ai" ? "active" : ""
+          }`}
+        >
+          {renderMarkdown(lastLog?.message || "")}
+        </div>
+        {spinnerActive && <div className="spinner" />}
+      </div>
+
+      {!lastLog && <Help />}
     </div>
   );
 }
@@ -99,8 +86,8 @@ function Help() {
   return (
     <div className="help-text">
       <p>
-        Click on the <code>Start Debug</code>{" "}
-        button to start debugging using the LLM Debugger.
+        Enable "Debug with AI" above. When you start a debug session via VS
+        Code's Run and Debug panel, the LLM Debugger workflow will run.
       </p>
     </div>
   );

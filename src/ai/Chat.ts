@@ -5,12 +5,12 @@ import process from "node:process";
 import { OpenAI } from "openai";
 import type { ChatCompletion } from "openai/resources/chat/completions";
 import type { ChatCompletionMessageParam, ChatCompletionTool } from "../types";
-
 import { initialBreakPointsSystemMessage } from "./prompts";
 
 export class AIChat {
   #messageHistory: ChatCompletionMessageParam[] = [];
   #functions: ChatCompletionTool[];
+  onSpinner?: (active: boolean) => void;
 
   constructor(
     systemMessage: ChatCompletionMessageParam,
@@ -24,10 +24,26 @@ export class AIChat {
     this.#messageHistory = [initialBreakPointsSystemMessage];
   }
 
-  ask(message: string, { withFunctions = true } = {}) {
-    // TODO: token count and shift items from the top of the history if necessary
+  async ask(message: string, { withFunctions = true } = {}) {
+    if (this.onSpinner) {
+      this.onSpinner(true);
+    }
     this.#messageHistory.push({ role: "user", content: message });
-    return callLlm(this.#messageHistory, withFunctions ? this.#functions : []);
+    try {
+      const response = await callLlm(
+        this.#messageHistory,
+        withFunctions ? this.#functions : []
+      );
+      if (this.onSpinner) {
+        this.onSpinner(false);
+      }
+      return response;
+    } catch (error) {
+      if (this.onSpinner) {
+        this.onSpinner(false);
+      }
+      throw error;
+    }
   }
 }
 

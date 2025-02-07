@@ -30,6 +30,14 @@ export class DebugLoopController extends EventEmitter {
 
   private structuredCode: StructuredCode[] = [];
 
+  constructor() {
+    super();
+    // Wire up the spinner events from AIChat to this controller.
+    this.chatWithHistory.onSpinner = (active: boolean) => {
+      this.emit("spinner", { active });
+    };
+  }
+
   setCode(code: StructuredCode[]) {
     this.structuredCode = code;
   }
@@ -39,6 +47,7 @@ export class DebugLoopController extends EventEmitter {
    * send it to the LLM, and handle the function calls it returns.
    */
   async handleThreadStopped(session: vscode.DebugSession) {
+    log.debug("handleThreadStopped");
     if (!this.live) return;
     if (this.finishing) return;
     if (!this.session) {
@@ -56,15 +65,13 @@ export class DebugLoopController extends EventEmitter {
 
   async setInitialBreakpoints() {
     log.ai("Setting initial breakpoints");
+    this.emit("spinner", { active: true });
     const response = await callLlm(
       getInitialBreakpointsMessage(this.structuredCode),
       breakpointFunctions,
     );
-    const [choice] = response.choices;
-    const content = choice?.message?.content;
-    if (content) {
-      log.info(content);
-    }
+    await this.handleLlmFunctionCall(response);
+    this.emit("spinner", { active: false });
   }
 
   reset() {
@@ -84,11 +91,12 @@ export class DebugLoopController extends EventEmitter {
     if (this.finishing) return;
     if (!this.live) return;
 
-    log.ai("Thinking");
+    log.ai("Thinking..");
+    this.emit("spinner", { active: true });
     const llmResponse = await this.chatWithHistory.ask(
       getPausedMessage(this.structuredCode, pausedState),
     );
-
+    this.emit("spinner", { active: false });
     if (this.finishing) return;
     if (!this.live) return;
 
@@ -134,6 +142,28 @@ export class DebugLoopController extends EventEmitter {
 
   stop() {
     this.live = false;
+  }
+
+  async pauseExecution() {
+    const session = vscode.debug.activeDebugSession;
+    if (!session) {
+      log.debug("Cannot pause. No active debug session.");
+      return;
+    }
+    try {
+      const threads = await session.customRequest("threads");
+      const threadId = threads.threads[0]?.id;
+      if (threadId === undefined) {
+        log.debug("No active thread found to pause.");
+        return;
+      }
+      await Promise.all([
+        session.customRequest("pause", { threadId }),
+        this.waitForThreadStopped(),
+      ]);
+    } catch (err) {
+      log.error(`Failed to pause execution: ${String(err)}`);
+    }
   }
 
   async setBreakpoint(functionArgsString: string) {
@@ -201,15 +231,12 @@ export class DebugLoopController extends EventEmitter {
       return;
     }
     try {
-      // Get the current thread ID - typically the first thread in a JavaScript debug session
       const threads = await session.customRequest("threads");
       const threadId = threads.threads[0]?.id;
-
       if (threadId === undefined) {
         log.debug("Cannot run command 'next'. No active thread found.");
         return;
       }
-
       await Promise.all([
         session.customRequest("next", { threadId }),
         this.waitForThreadStopped(),
@@ -226,15 +253,12 @@ export class DebugLoopController extends EventEmitter {
       return;
     }
     try {
-      // Get the current thread ID - typically the first thread in a JavaScript debug session
       const threads = await session.customRequest("threads");
       const threadId = threads.threads[0]?.id;
-
       if (threadId === undefined) {
         log.debug("Cannot stepIn. No active thread found.");
         return;
       }
-
       await Promise.all([
         session.customRequest("stepIn", { threadId }),
         this.waitForThreadStopped(),
@@ -251,15 +275,12 @@ export class DebugLoopController extends EventEmitter {
       return;
     }
     try {
-      // Get the current thread ID - typically the first thread in a JavaScript debug session
       const threads = await session.customRequest("threads");
       const threadId = threads.threads[0]?.id;
-
       if (threadId === undefined) {
         log.debug("Cannot run command 'stepOut'. No active thread found.");
         return;
       }
-
       await Promise.all([
         session.customRequest("stepOut", { threadId }),
         this.waitForThreadStopped(),
@@ -277,14 +298,12 @@ export class DebugLoopController extends EventEmitter {
       return;
     }
     try {
-      // Typically the first JS thread:
       const threads = await session.customRequest("threads");
       const threadId = threads.threads[0]?.id;
       if (threadId === undefined) {
         log.debug("Cannot run command 'continue'. No active thread found.");
         return;
       }
-      // Kick off "continue":
       await Promise.all([
         session.customRequest("continue", { threadId }),
         this.waitForThreadStopped(),

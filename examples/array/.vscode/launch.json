@@ -4,7 +4,6 @@
       "type": "node",
       "request": "launch",
       "name": "Debug Test",
-      "stopOnEntry": true,
       "program": "${workspaceFolder}/array.test.js",
       "env": {
         "NODE_ENV": "test"

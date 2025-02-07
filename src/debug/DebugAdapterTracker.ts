@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { DebugLoopController } from "./DebugLoopController";
-
+import log from "../logger";
 export class DebugAdapterTracker implements vscode.DebugAdapterTracker {
   private session: vscode.DebugSession;
   private controller: DebugLoopController;
@@ -12,6 +12,11 @@ export class DebugAdapterTracker implements vscode.DebugAdapterTracker {
 
   onWillStopSession(): void {
     this.controller.finish();
+  }
+
+  async onWillStartSession(): Promise<void> {
+    log.debug("onWillStartSession");
+    await this.controller.waitForThreadStopped();
   }
 
   async onDidSendMessage(message: { type: string; event: string }) {
