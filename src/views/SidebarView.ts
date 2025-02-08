@@ -25,6 +25,15 @@ export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
       }
     });
 
+    this.debugLoopController.on("isInSession", (data: { isInSession: boolean }) => {
+      if (this._view) {
+        this._view.webview.postMessage({
+          command: "isInSession",
+          isInSession: data.isInSession,
+        });
+      }
+    });
+
     // Set initial value for debug mode
     this.setDebugEnabled(this._extensionContext.workspaceState.get<boolean>("llmDebuggerEnabled", true));
   }
@@ -60,11 +69,6 @@ export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
   public setDebugEnabled(enabled: boolean): void {
     // Update the workspace state for persistent storage
     this._extensionContext.workspaceState.update("llmDebuggerEnabled", enabled);
-
-    // Optionally, notify the debug loop controller if a method exists
-    if (this.debugLoopController) {
-      this.debugLoopController.setAiMode(enabled);
-    }
 
     // If the view is available, send the updated debug state
     if (this._view) {
@@ -115,17 +119,6 @@ export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
       script-src 'nonce-${nonce}';">`);
 
     return $.html();
-  }
-
-  public logMessage(message: string, type: string, timestamp: number) {
-    if (this._view) {
-      this._view.webview.postMessage({
-        command: "log",
-        message,
-        type,
-        timestamp,
-      });
-    }
   }
 }
 

@@ -44,8 +44,9 @@ export class DebugLoopController extends EventEmitter {
   }
 
   shouldLoop() {
-    log.debug(`Should loop? ${JSON.stringify({ live: this.live, finishing: this.finishing, session: this.session !== null })}`);
-    return this.live && !this.finishing && this.session !== null;
+    const llmDebuggerEnabled = vscode.workspace.getConfiguration("llm").get("debuggerEnabled", true);
+    log.debug(`Should loop? ${JSON.stringify({ live: this.live, finishing: this.finishing, session: this.session !== null, llmDebuggerEnabled })}`);
+    return this.live && !this.finishing && this.session !== null && llmDebuggerEnabled;
   }
 
   /**
@@ -66,7 +67,7 @@ export class DebugLoopController extends EventEmitter {
   }
 
   async setInitialBreakpoints() {
-    log.ai("Setting initial breakpoints");
+    log.debug("Setting initial breakpoints");
     this.emit("spinner", { active: true });
     const structuredCode = this.sourceCodeCollector.gatherWorkspaceCode();
     const response = await callLlm(
@@ -94,7 +95,7 @@ export class DebugLoopController extends EventEmitter {
     // checking again since while we were gathering paused state, the live flag could have been set to false
     if (!this.shouldLoop()) return;
 
-    log.ai("Thinking..");
+    log.debug("Thinking..");
     this.emit("spinner", { active: true });
 
     // --- DEBUGGING STEP 2: Log the message sent to the LLM ---
@@ -124,22 +125,17 @@ export class DebugLoopController extends EventEmitter {
   async start() {
     log.debug("Starting debug loop controller");
     this.live = true;
+    this.emit("isInSession", { isInSession: true });
     await this.loop();
   }
 
-  setAiMode(enabled: boolean) {
-    // if (enabled) {
-    //   this.start();
-    // } else {
-    //   this.stop();
-    // }
-  }
 
   async finish() {
     if (this.finishing) return;
     this.finishing = true;
+    this.emit('isInSession', { isInSession: false });
 
-    log.ai("Debug session finished. Providing code fix and explanation");
+    log.debug("Debug session finished. Providing code fix and explanation");
 
     // Provide final fix explanation if wanted...
     const response = await this.chat.ask(
@@ -323,7 +319,7 @@ export class DebugLoopController extends EventEmitter {
 
     for (const toolCall of choice.message?.tool_calls || []) {
       const { name, arguments: argsStr } = toolCall.function;
-      log.fn(`${name}(${argsStr && argsStr !== '{}' ? argsStr : ""})`);
+      log.debug(`${name}(${argsStr && argsStr !== '{}' ? argsStr : ""})`);
 
       switch (name) {
         case "setBreakpoint":

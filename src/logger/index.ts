@@ -11,7 +11,6 @@ class Logger {
   private isEnabled = true;
   private logChannel: vscode.LogOutputChannel;
   private thinkingTimeout: NodeJS.Timeout | null = null;
-  private sidebarProvider: LlmDebuggerSidebarProvider | null = null;
   private logEntries: LogEntry[] = [];
   private prefix: string = ""
 
@@ -35,30 +34,10 @@ class Logger {
     return new Logger(this.logChannel, `${name}: `);
   }
 
-  setSidebarProvider(provider: LlmDebuggerSidebarProvider) {
-    this.sidebarProvider = provider;
-    // Replay existing logs to the new provider
-    this.logEntries.forEach((entry) => {
-      this.sidebarProvider?.logMessage(
-        entry.message,
-        entry.type,
-        entry.timestamp,
-      );
-    });
-  }
+
 
   loadPersistedLogs(entries: LogEntry[]) {
     this.logEntries = entries;
-    // Replay logs to sidebar if provider exists
-    if (this.sidebarProvider) {
-      entries.forEach((entry) => {
-        this.sidebarProvider?.logMessage(
-          entry.message,
-          entry.type,
-          entry.timestamp,
-        );
-      });
-    }
   }
 
   getPersistedLogs(): LogEntry[] {
@@ -90,7 +69,6 @@ class Logger {
       timestamp: Date.now(),
     };
     this.logEntries.push(entry);
-    this.sidebarProvider?.logMessage(message, type, entry.timestamp);
   }
 
   private writeToOutput(
@@ -106,16 +84,6 @@ class Logger {
     this.logChannel[level](`${this.prefix}${msg}`);
   }
 
-  ai(...msgs: string[]) {
-    this.info("AI: " + msgs.join(" "));
-  }
-
-  fn(...msgs: string[]) {
-    this.clearThinkingTimeout();
-    const message = msgs.join(" ");
-    this.writeToOutput(message, "debug");
-    this.logToSidebar(message, "fn");
-  }
 
   debug(...msgs: string[]) {
     this.clearThinkingTimeout();
