@@ -9,16 +9,22 @@ export class SourceCodeCollector {
     constructor(workspaceFolder?: vscode.WorkspaceFolder) {
         this.workspaceFolder = workspaceFolder;
     }
+
+    setWorkspaceFolder(workspaceFolder: vscode.WorkspaceFolder) {   
+        this.workspaceFolder = workspaceFolder;
+    }
+
     /**
      * Runs `yek` to retrieve a concatenated string of repo code, then splits it into structured lines per file.
      */
     gatherWorkspaceCode(): StructuredCode[] {
-        log.debug("gatherWorkspaceCode");
         if (!this.workspaceFolder) return [];
         const wsFolder = this.workspaceFolder?.uri.fsPath;
-        if (!wsFolder) return [];
+        if (!wsFolder) {
+            log.error("No workspace folder found");
+            return [];
+        }
 
-        log.debug("wsFolder", wsFolder);
         // Hardcoded for now
         return ["array.js", "array.test.js"].map((file) => ({
             filePath: path.join(wsFolder, file),

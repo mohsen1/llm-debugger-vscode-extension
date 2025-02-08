@@ -24,7 +24,12 @@ export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
         });
       }
     });
+
+    // Set initial value for debug mode
+    this.setDebugEnabled(this._extensionContext.workspaceState.get<boolean>("llmDebuggerEnabled", true));
   }
+
+
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this._view = webviewView;
@@ -45,10 +50,26 @@ export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage((message) => {
       switch (message.command) {
         case "toggleDebug":
-          this._extensionContext.workspaceState.update("llmDebuggerEnabled", message.enabled);
+          this.setDebugEnabled(message.enabled);
           break;
       }
     });
+  }
+
+  // New method to update debug enabled state
+  public setDebugEnabled(enabled: boolean): void {
+    // Update the workspace state for persistent storage
+    this._extensionContext.workspaceState.update("llmDebuggerEnabled", enabled);
+
+    // Optionally, notify the debug loop controller if a method exists
+    if (this.debugLoopController) {
+      this.debugLoopController.setAiMode(enabled);
+    }
+
+    // If the view is available, send the updated debug state
+    if (this._view) {
+      this._view.webview.postMessage({ command: "setDebugEnabled", enabled });
+    }
   }
 
   private getHtmlForWebview(webview: vscode.Webview): string {

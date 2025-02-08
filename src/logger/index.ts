@@ -8,15 +8,31 @@ export interface LogEntry {
 }
 
 class Logger {
+  private isEnabled = true;
   private logChannel: vscode.LogOutputChannel;
   private thinkingTimeout: NodeJS.Timeout | null = null;
   private sidebarProvider: LlmDebuggerSidebarProvider | null = null;
   private logEntries: LogEntry[] = [];
+  private prefix: string = ""
 
-  constructor() {
-    this.logChannel = vscode.window.createOutputChannel("LLM Debugger", {
+  constructor(logChannel: vscode.LogOutputChannel | null = null, prefix: string = "") {
+    this.logChannel = logChannel || vscode.window.createOutputChannel("LLM Debugger", {
       log: true,
     });
+    this.prefix = prefix;
+  }
+
+  enable() {
+    this.isEnabled = true;
+  }
+
+  disable() {
+    this.isEnabled = false;
+  }
+
+
+  createSubLogger(name: string) {    
+    return new Logger(this.logChannel, `${name}: `);
   }
 
   setSidebarProvider(provider: LlmDebuggerSidebarProvider) {
@@ -84,7 +100,10 @@ class Logger {
       "debug" | "error" | "info" | "warn" | "trace"
     > = "info",
   ) {
-    this.logChannel[level](msg);
+    if (!this.isEnabled) {
+      return;
+    }
+    this.logChannel[level](`${this.prefix}${msg}`);
   }
 
   ai(...msgs: string[]) {
