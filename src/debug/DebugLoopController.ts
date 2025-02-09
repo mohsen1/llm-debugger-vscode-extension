@@ -23,6 +23,7 @@ const log = logger.createSubLogger("DebugLoopController");
  */
 export class DebugLoopController extends EventEmitter {
   private live = false;
+  private finished = false;
   private session: vscode.DebugSession | null = null;
 
   constructor(private sourceCodeCollector: SourceCodeCollector) {
@@ -90,6 +91,7 @@ export class DebugLoopController extends EventEmitter {
     this.session = null;
     this.chat.clearHistory();
     this.live = false;
+    this.finished = false;
   }
 
   async loop() {
@@ -130,6 +132,11 @@ export class DebugLoopController extends EventEmitter {
     await this.loop(); 
   }
 
+  async clear() {
+    this.emit("spinner", { active: false });
+    this.emit("debugResults", { results: null });
+  }
+
   async start() {
     log.debug("Starting debug loop controller");
     this.live = true;
@@ -139,7 +146,8 @@ export class DebugLoopController extends EventEmitter {
 
 
   async finish() {
-    
+    if (this.finished) return;
+    this.finished = true;
 
     log.debug("Debug session finished. Providing code fix and explanation");
 

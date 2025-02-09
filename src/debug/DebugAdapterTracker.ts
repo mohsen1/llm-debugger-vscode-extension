@@ -33,6 +33,7 @@ export class DebugAdapterTracker implements vscode.DebugAdapterTracker {
       }
     });
     log.debug("onWillStartSession");
+    await this.controller.clear()
     await this.session.customRequest("launch");
     await this.session.customRequest("pause");
     await this.controller.setInitialBreakpoints();

@@ -23,8 +23,9 @@ body {
 }
 
 .sidebar-container {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   display: grid;
+  align-items: center;
   grid-template-rows: auto 1fr;
   height: 100%;
 }
@@ -119,6 +120,29 @@ body {
 
 .log-warn {
   color: var(--vscode-debugConsole-warningForeground);
+}
+
+.results {
+  max-width: 100%;
+  overflow: auto;
+}
+
+.results header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-height: 1rem;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content {
+  max-width: 100%;
+  overflow: auto;
+}
+
+.markdown-content p:first-child {
+  margin-top: 0;
 }
 
 .markdown-content code {

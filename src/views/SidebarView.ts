@@ -23,7 +23,7 @@ export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
         log.debug(`command ${JSON.stringify(command)} with data ${JSON.stringify(data)}`);
         if (this._view) {
           this._view.webview.postMessage({
-            command: "spinner",
+            command,
             ...data,
           });
         }

@@ -45,11 +45,7 @@ export function App() {
 
   return (
     <div className="sidebar-container">
-       <pre>{JSON.stringify({
-          isInSession, dobugResults, spinnerActive, debugEnabled
-        }, null, 2)}</pre>
       <div className="control-panel">
-       
         <input
           type="checkbox"
           id="debug-with-ai"
@@ -61,7 +57,7 @@ export function App() {
       </div>
       {spinnerActive && <Thinking />}
       {!isInSession && !dobugResults && <Help />}
-      {dobugResults && <Markdown message={dobugResults} />}
+      {dobugResults && <Results message={dobugResults} onClear={() => { setDebugResults(null) }} />}
     </div>
   );
 }
@@ -71,6 +67,18 @@ function Thinking() {
     <div className="thinking">
       <div className="spinner"></div>
       <div className="text">Thinking</div>
+    </div>
+  )
+}
+
+function Results({ message, onClear }: { message: string; onClear: () => void }) {
+  return (
+    <div className="results">
+      <header>
+        <h4>Results</h4>
+        <a href="#" onClick={() => onClear()}>Clear</a>
+      </header>
+      <Markdown message={message} />
     </div>
   )
 }
