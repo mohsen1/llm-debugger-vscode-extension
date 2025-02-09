@@ -3,6 +3,9 @@ import * as fs from "fs";
 import * as crypto from "crypto";
 import * as cheerio from "cheerio";
 import { DebugLoopController } from "../debug/DebugLoopController";
+import logger from "../logger";
+
+const log = logger.createSubLogger("SidebarView");
 
 export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
   private debugLoopController: DebugLoopController;
@@ -15,30 +18,21 @@ export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
     this._extensionContext = context;
     this._extensionUri = context.extensionUri;
 
-    // Listen for spinner events and forward them to the webview.
-    this.debugLoopController.on("spinner", (data: { active: boolean }) => {
-      if (this._view) {
-        this._view.webview.postMessage({
-          command: "spinner",
-          active: data.active,
-        });
-      }
-    });
-
-    this.debugLoopController.on("isInSession", (data: { isInSession: boolean }) => {
-      if (this._view) {
-        this._view.webview.postMessage({
-          command: "isInSession",
-          isInSession: data.isInSession,
-        });
-      }
-    });
+    for (const command of ["spinner", "setDebugEnabled", "isInSession", "debugResults"]) {
+      this.debugLoopController.on(command, (data) => {
+        log.debug(`command ${JSON.stringify(command)} with data ${JSON.stringify(data)}`);
+        if (this._view) {
+          this._view.webview.postMessage({
+            command: "spinner",
+            ...data,
+          });
+        }
+      })
+    };
 
     // Set initial value for debug mode
     this.setDebugEnabled(this._extensionContext.workspaceState.get<boolean>("llmDebuggerEnabled", true));
   }
-
-
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this._view = webviewView;

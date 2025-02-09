@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import fs from "node:fs";
+import fsExtra from "fs-extra";
 import * as vscode from "vscode";
 import { StructuredCode } from "../types";
 import log from "../logger";
@@ -10,7 +11,7 @@ export class SourceCodeCollector {
         this.workspaceFolder = workspaceFolder;
     }
 
-    setWorkspaceFolder(workspaceFolder: vscode.WorkspaceFolder) {   
+    setWorkspaceFolder(workspaceFolder: vscode.WorkspaceFolder) {
         this.workspaceFolder = workspaceFolder;
     }
 
@@ -25,16 +26,22 @@ export class SourceCodeCollector {
             return [];
         }
 
-        // Hardcoded for now
-        return ["array.js", "array.test.js"].map((file) => ({
-            filePath: path.join(wsFolder, file),
-            lines: fs
-                .readFileSync(path.join(wsFolder, file), "utf-8")
-                .split("\n")
-                .map((text, idx) => ({
-                    lineNumber: idx + 1,
-                    text,
-                })),
-        }));
+        // get list of files in the workspace
+        // TODO: handle gitignore
+        return fsExtra.readdirSync(wsFolder, { withFileTypes: true, recursive: true })
+            .filter(dirent => dirent.isFile())
+            .map((dirent) => {
+                const fullPath = path.join(dirent.parentPath, dirent.name);
+                return {
+                    filePath: fullPath,
+                    lines: fs
+                        .readFileSync(fullPath, "utf-8")
+                        .split("\n")
+                        .map((text, idx) => ({
+                            lineNumber: idx + 1,
+                            text,
+                        })),
+                }
+            })
     }
 }

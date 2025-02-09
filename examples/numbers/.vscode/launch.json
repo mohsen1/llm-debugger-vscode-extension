@@ -1,0 +1,16 @@
+{
+    "configurations": [
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "Debug Test",
+        "program": "${workspaceFolder}/median.js",
+        "env": {
+          "NODE_ENV": "test"
+        },
+        "internalConsoleOptions": "neverOpen",
+        "skipFiles": ["<node_internals>/**"]
+      }
+    ]
+  }
+  

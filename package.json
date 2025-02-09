@@ -78,7 +78,7 @@
     "build:extension": "node esbuild.extension.js",
     "build": "npm run build:extension && npm run build:webview",
     "dev:extension": "node esbuild.extension.js --watch",
-    "dev": "rm -rf out && concurrently \"npm run dev:extension\" \"npm run dev:webview\"",
+    "dev": "rm -rf out && rm -rf src/webview/out && concurrently \"npm run dev:extension\" \"npm run dev:webview\"",
     "update": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
     "vscode:prepublish": "tsc",
@@ -91,12 +91,14 @@
   "dependencies": {
     "@vscode/debugadapter": "^1.68.0",
     "cheerio": "^1.0.0",
+    "fs-extra": "^11.3.0",
     "markdown-it": "^14.1.0",
     "openai": "^4.82.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^22.4.1",
     "@types/react": "^19.0.0",

@@ -23,7 +23,6 @@ const log = logger.createSubLogger("DebugLoopController");
  */
 export class DebugLoopController extends EventEmitter {
   private live = false;
-  private finishing = false;
   private session: vscode.DebugSession | null = null;
 
   constructor(private sourceCodeCollector: SourceCodeCollector) {
@@ -43,10 +42,16 @@ export class DebugLoopController extends EventEmitter {
     this.session = session;
   }
 
-  shouldLoop() {
+  async shouldLoop() {
+    // check if session has threads live
+    const threadsRequestResponse = await this.session?.customRequest("threads");
+    if (!threadsRequestResponse?.threads?.length) {
+      log.error("No threads found in session");
+      return false;
+    }
     const llmDebuggerEnabled = vscode.workspace.getConfiguration("llm").get("debuggerEnabled", true);
-    log.debug(`Should loop? ${JSON.stringify({ live: this.live, finishing: this.finishing, session: this.session !== null, llmDebuggerEnabled })}`);
-    return this.live && !this.finishing && this.session !== null && llmDebuggerEnabled;
+    log.debug(`Should loop? ${JSON.stringify({ live: this.live, session: this.session !== null, llmDebuggerEnabled })}`);
+    return this.live && this.session !== null && llmDebuggerEnabled;
   }
 
   /**
@@ -66,8 +71,11 @@ export class DebugLoopController extends EventEmitter {
     });
   }
 
-  async setInitialBreakpoints() {
+  async setInitialBreakpoints(removeExisting = true) {
     log.debug("Setting initial breakpoints");
+    if (removeExisting) {
+      vscode.debug.removeBreakpoints(vscode.debug.breakpoints.filter((bp) => bp.enabled));
+    }
     this.emit("spinner", { active: true });
     const structuredCode = this.sourceCodeCollector.gatherWorkspaceCode();
     const response = await callLlm(
@@ -81,19 +89,20 @@ export class DebugLoopController extends EventEmitter {
   reset() {
     this.session = null;
     this.chat.clearHistory();
-    this.finishing = false;
     this.live = false;
   }
 
   async loop() {
-    if (!this.shouldLoop()) return;
+    let shouldLoop = await this.shouldLoop();
+    if (!shouldLoop) return;
 
     log.debug("Gathering paused state");
     const debugState = new DebugState();
     const pausedState = await debugState.gatherPausedState(this.session!);
 
     // checking again since while we were gathering paused state, the live flag could have been set to false
-    if (!this.shouldLoop()) return;
+    shouldLoop = await this.shouldLoop();
+    if (!shouldLoop) return;
 
     log.debug("Thinking..");
     this.emit("spinner", { active: true });
@@ -104,7 +113,7 @@ export class DebugLoopController extends EventEmitter {
 
     const llmResponse = await this.chat.ask(messageToSend);
     this.emit("spinner", { active: false });
-    if (this.finishing) return;
+    // if (this.finishing) return;
     if (!this.live) return;
 
     const [choice] = llmResponse.choices;
@@ -116,10 +125,9 @@ export class DebugLoopController extends EventEmitter {
     // --- DEBUGGING STEP 3: Ensure awaits are correct ---
     await this.handleLlmFunctionCall(llmResponse); // Make sure this is awaited
 
-    if (this.finishing) return;
     if (!this.live) return;
 
-    await this.loop(); // And this
+    await this.loop(); 
   }
 
   async start() {
@@ -131,25 +139,26 @@ export class DebugLoopController extends EventEmitter {
 
 
   async finish() {
-    if (this.finishing) return;
-    this.finishing = true;
-    this.emit('isInSession', { isInSession: false });
+    
 
     log.debug("Debug session finished. Providing code fix and explanation");
 
     // Provide final fix explanation if wanted...
+    this.emit('spinner', { active: true });
     const response = await this.chat.ask(
       "Debug session finished. Provide a code fix and explain your reasoning.",
       { withFunctions: false },
     );
+    this.emit('spinner', { active: false });
     const [choice] = response.choices;
     const content = choice?.message?.content;
     if (content) {
       log.info(content);
+      this.emit("debugResults", { results: content });
     } else {
       log.info("No content from LLM");
     }
-
+    this.emit('isInSession', { isInSession: false });
     this.stop();
   }
 
