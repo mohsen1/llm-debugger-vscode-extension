@@ -3,15 +3,22 @@ import * as vscode from "vscode";
 import log from "../logger";
 
 interface SimpleBreakpoint {
-  type: string;
+  type: "source" | "function" | "unknown";
   path?: string;
   line?: number;
   functionName?: string;
 }
 
+interface SimpleStackFrame {
+  name: string;
+  line: number;
+  column: number;
+  source: string;
+}
+
 export interface PausedState {
   breakpoints: SimpleBreakpoint[];
-  pausedStack: StackFrame[];
+  pausedStack: SimpleStackFrame[];
   topFrameVariables: {
     scopeName: string;
     variables: { name: string; value: string }[];
@@ -24,7 +31,7 @@ export class DebugState {
    *  - For SourceBreakpoints: file path and line number
    *  - For FunctionBreakpoints: function name
    */
-  getEnabledBreakpoints() {
+  getEnabledBreakpoints(): SimpleBreakpoint[] {
     return vscode.debug.breakpoints
       .filter((bp) => bp.enabled)
       .map((bp) => {
@@ -48,7 +55,7 @@ export class DebugState {
    * Gets a list of frames (name, line, column, source) for the currently paused thread.
    * To keep it small, we only include the basic location info.
    */
-  async getPausedStack(session: vscode.DebugSession) {
+  async getPausedStack(session: vscode.DebugSession): Promise<SimpleStackFrame[]> {
     const threadsResponse = await session.customRequest("threads");
     const allThreads = threadsResponse?.threads || [];
 
@@ -75,7 +82,10 @@ export class DebugState {
   /**
    * Retrieves variables from the top stack frame (locals only), excluding large/global scopes.
    */
-  async getTopFrameVariables(session: vscode.DebugSession) {
+  async getTopFrameVariables(session: vscode.DebugSession): Promise<{
+    scopeName: string;
+    variables: { name: string; value: string }[];
+  }[]> {
     // Hard-code threadId=1 for simplicity; adapt as needed if you track paused thread IDs elsewhere.
     const threadId = 1;
 
@@ -98,7 +108,7 @@ export class DebugState {
 
     for (const scope of scopes) {
       // Skip anything that isn't a local/closure scope to keep data minimal
-      if (!["Local", "Closure"].includes(scope.name)) continue;
+      if (!["Local", "Closure", "Exception"].includes(scope.name)) continue;
 
       const varsResponse = await session.customRequest("variables", {
         variablesReference: scope.variablesReference,
