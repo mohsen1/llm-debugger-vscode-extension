@@ -5,6 +5,28 @@ import type {
 } from "openai/resources";
 import type { StructuredCode } from "../types";
 
+interface StackFrame {
+  name: string;
+  source: string;
+  line: number;
+  column: number;
+}
+
+interface Variable {
+  name: string;
+  value: string;
+}
+
+interface Scope {
+  scopeName: string;
+  variables: Variable[];
+}
+
+interface PausedState {
+  pausedStack: StackFrame[];
+  topFrameVariables: Scope[];
+}
+
 export const systemMessage: ChatCompletionSystemMessageParam = {
   role: "system",
   content: "You are an AI assistant that decides debugging steps.",
@@ -24,7 +46,7 @@ export function getInitialBreakpointsMessage(
 
 export function getPausedMessage(
   structuredCode: StructuredCode[],
-  pausedState: unknown,
+  pausedState: PausedState,
 ): string {
   const message = ["# Code:", serializeStructuredCode(structuredCode), ""];
 
@@ -38,6 +60,32 @@ export function getPausedMessage(
     "Choose next action by calling setBreakpoint, removeBreakpoint, next, stepIn, stepOut, or continue.",
     "Always make sure there are breakpoints set before calling continue.",
     "Once you understood the problem, instead of calling any tools, respond with a code fix and explain your reasoning.",
+  );
+
+  return message.join("\n");
+}
+
+export function getExceptionMessage(
+  structuredCode: StructuredCode[],
+  pausedState: PausedState,
+): string {
+  const message = ["# Code:", serializeStructuredCode(structuredCode), ""];
+
+  if (pausedState) {
+    const stack = pausedState.pausedStack.map((frame: StackFrame) => {
+      return `at ${frame.name} (${frame.source}:${frame.line}:${frame.column})`;
+    }).join("\n");
+
+    const exception = pausedState.topFrameVariables.find((scope: Scope) => scope.scopeName === 'Exception');
+    const exceptionValue = exception?.variables.find((v: Variable) => v.name === 'exception')?.value;
+    message.push("# Exception:", exceptionValue || "Unknown exception", stack);
+  }
+
+  message.push(
+    "# Instructions:",
+    "Debugger is in paused state due to an uncaught exception.",
+    "Analyze the exception and stack trace to understand the root cause.",
+    "Provide a code fix and explain your reasoning.",
   );
 
   return message.join("\n");

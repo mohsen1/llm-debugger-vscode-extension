@@ -5,6 +5,15 @@ import logger from "../logger";
 const log = logger.createSubLogger("DebugAdapterTracker");
 // log.disable();
 
+interface DebugMessage {
+  type: string;
+  command?: string;
+  event?: string;
+  body?: {
+    reason?: string;
+  };
+}
+
 export class DebugAdapterTracker implements vscode.DebugAdapterTracker {
   private session: vscode.DebugSession;
   private controller: DebugLoopController;
@@ -14,44 +23,29 @@ export class DebugAdapterTracker implements vscode.DebugAdapterTracker {
     this.controller = controller;
   }
 
-  onWillStopSession(): void {
-    this.controller.finish();
-  }
-
-  onWillReceiveMessage(message: any): void {
+  async onWillReceiveMessage(message: DebugMessage) {
     log.debug(`onWillReceiveMessage: ${message.type} - ${JSON.stringify(message.command)}`);
+    if (message.command === "disconnect") {
+      await this.controller.finish();
+    }
   }
 
   async onWillStartSession(): Promise<void> {
-    let hasStartedController = false;
-    vscode.debug.onDidStartDebugSession((session) => {
-      if (!hasStartedController && session.id === this.session.id) {
-        hasStartedController = true;
-        log.debug(`Starting AI debug session: ${session.id}`);
-        this.controller.setSession(session);
-        this.controller.start();
-      }
-    });
     log.debug("onWillStartSession");
-    await this.controller.clear()
-    await this.session.customRequest("launch");
-    await this.session.customRequest("pause");
-    await this.controller.setInitialBreakpoints();
-    await this.session.customRequest("continue");
-    log.debug("Waiting for thread to stop...");
-    await this.controller.waitForThreadStopped();
-    log.debug('Breakpoint set and thread stopped');
-
+    await this.controller.clear();
+    this.controller.setSession(this.session);
+    await this.controller.start();
   }
 
-  async onDidSendMessage(message: { type: string; event: string }) {
+  async onDidSendMessage(message: DebugMessage) {
+    log.debug("onDidSendMessage", JSON.stringify(message));
     if (message.type === "event" && message.event === "stopped") {
-      log.debug(`onDidSendMessage Received message: ${message.type} - ${message.event}`);
-      this.controller.emit("threadStopped");
-    }
-    if (message.type === "event" && message.event === "terminated") {
-      log.debug(`onDidSendMessage Received message: ${message.type} - ${message.event}`);
-      this.controller.finish();
+      if (message.body?.reason === "exception") {
+        log.debug('stopped due to exception');
+        await this.controller.handleException(this.session);
+      } else {
+        await this.controller.loop();
+      }
     }
   }
 
@@ -60,7 +54,4 @@ export class DebugAdapterTracker implements vscode.DebugAdapterTracker {
     this.controller.finish();
   }
 
-  onExit() {
-    this.controller.finish();
-  }
 }

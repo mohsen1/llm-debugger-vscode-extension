@@ -7,6 +7,7 @@ import {
   debugFunctions,
   getInitialBreakpointsMessage,
   getPausedMessage,
+  getExceptionMessage,
   systemMessage,
 } from "../ai/prompts";
 import { AIChat, callLlm } from "../ai/Chat";
@@ -25,6 +26,7 @@ export class DebugLoopController extends EventEmitter {
   private live = false;
   private finished = false;
   private session: vscode.DebugSession | null = null;
+  private previousBreakpoints: vscode.Breakpoint[] = [];
 
   constructor(private sourceCodeCollector: SourceCodeCollector) {
     super();
@@ -55,27 +57,51 @@ export class DebugLoopController extends EventEmitter {
     return this.live && this.session !== null && llmDebuggerEnabled;
   }
 
-  /**
-   * Called whenever a "stopped" event occurs. We gather paused state,
-   * send it to the LLM, and handle the function calls it returns.
-   */
-  async handleThreadStopped(session: vscode.DebugSession) {
+  async handleException(session: vscode.DebugSession) {
+    log.debug("Handling exception...");
+
     if (session !== this.session) return;
-    log.debug("Handling thread stop...");
-    await this.loop();
+    log.debug("Gathering paused state");
+    const debugState = new DebugState();
+    const pausedState = await debugState.gatherPausedState(this.session!);
+
+    // checking again since while we were gathering paused state, the live flag could have been set to false
+    const shouldLoop = await this.shouldLoop();
+    if (!shouldLoop) return;
+
+    log.debug("Thinking..");
+    this.emit("spinner", { active: true });
+
+    const messageToSend = getExceptionMessage(this.sourceCodeCollector.gatherWorkspaceCode(), pausedState);
+    log.debug("Message to LLM:", messageToSend);
+
+    const llmResponse = await this.chat.ask(messageToSend, { withFunctions: false });
+    this.emit("spinner", { active: false });
+    if (!this.live) return;
+
+    const [choice] = llmResponse.choices;
+    const content = choice?.message?.content;
+    if (content) {
+      log.info(content);
+      this.emit("debugResults", { results: content });
+    } else {
+      log.info("No content from LLM");
+    }
+    this.emit('isInSession', { isInSession: false });
+    this.stop();
   }
 
   waitForThreadStopped() {
     log.debug("Waiting for thread to stop...");
     return new Promise<void>((resolve) => {
-      this.on("threadStopped", resolve);
+      this.once("threadStopped", resolve); // Use once to avoid memory leaks
     });
   }
 
   async setInitialBreakpoints(removeExisting = true) {
     log.debug("Setting initial breakpoints");
     if (removeExisting) {
-      vscode.debug.removeBreakpoints(vscode.debug.breakpoints.filter((bp) => bp.enabled));
+      vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
     }
     this.emit("spinner", { active: true });
     const structuredCode = this.sourceCodeCollector.gatherWorkspaceCode();
@@ -108,14 +134,11 @@ export class DebugLoopController extends EventEmitter {
 
     log.debug("Thinking..");
     this.emit("spinner", { active: true });
-
-    // --- DEBUGGING STEP 2: Log the message sent to the LLM ---
     const messageToSend = getPausedMessage(this.sourceCodeCollector.gatherWorkspaceCode(), pausedState);
     log.debug("Message to LLM:", messageToSend);
 
     const llmResponse = await this.chat.ask(messageToSend);
     this.emit("spinner", { active: false });
-    // if (this.finishing) return;
     if (!this.live) return;
 
     const [choice] = llmResponse.choices;
@@ -123,13 +146,10 @@ export class DebugLoopController extends EventEmitter {
     if (content) {
       log.info(content);
     }
-
-    // --- DEBUGGING STEP 3: Ensure awaits are correct ---
-    await this.handleLlmFunctionCall(llmResponse); // Make sure this is awaited
+    
+    await this.handleLlmFunctionCall(llmResponse);
 
     if (!this.live) return;
-
-    await this.loop(); 
   }
 
   async clear() {
@@ -141,9 +161,11 @@ export class DebugLoopController extends EventEmitter {
     log.debug("Starting debug loop controller");
     this.live = true;
     this.emit("isInSession", { isInSession: true });
-    await this.loop();
+    await this.setInitialBreakpoints();  // Set initial breakpoints
+    if (this.session) {
+      await this.session.customRequest("continue", { threadId: 1 }); // Continue execution
+    }
   }
-
 
   async finish() {
     if (this.finished) return;
@@ -188,8 +210,13 @@ export class DebugLoopController extends EventEmitter {
       const location = new vscode.Location(uri, position);
       const breakpoint = new vscode.SourceBreakpoint(location, true);
 
+      // Remove existing breakpoints before adding a new one
+      vscode.debug.removeBreakpoints(this.previousBreakpoints);
       vscode.debug.addBreakpoints([breakpoint]);
+      this.previousBreakpoints = [breakpoint]; // Store the new breakpoint
+
       log.debug(`Set breakpoint at ${fullPath}:${line}`);
+
     } catch (err) {
       log.error(`Failed to set breakpoint: ${String(err)}`);
       vscode.window.showErrorMessage(
@@ -245,10 +272,8 @@ export class DebugLoopController extends EventEmitter {
         log.debug("Cannot run command 'next'. No active thread found.");
         return;
       }
-      await Promise.all([
-        session.customRequest("next", { threadId }),
-        this.waitForThreadStopped(),
-      ]);
+      await session.customRequest("next", { threadId }); // Await directly
+      await this.waitForThreadStopped(); // Then, wait for stop.
     } catch (err) {
       log.error(`Failed to run command 'next': ${String(err)}`);
     }
@@ -267,10 +292,8 @@ export class DebugLoopController extends EventEmitter {
         log.debug("Cannot stepIn. No active thread found.");
         return;
       }
-      await Promise.all([
-        session.customRequest("stepIn", { threadId }),
-        this.waitForThreadStopped(),
-      ]);
+      await session.customRequest("stepIn", { threadId }); // Await directly
+      await this.waitForThreadStopped();  // Then wait.
     } catch (err) {
       log.error(`Failed to step in: ${String(err)}`);
     }
@@ -289,10 +312,8 @@ export class DebugLoopController extends EventEmitter {
         log.debug("Cannot run command 'stepOut'. No active thread found.");
         return;
       }
-      await Promise.all([
-        session.customRequest("stepOut", { threadId }),
-        this.waitForThreadStopped(),
-      ]);
+      await session.customRequest("stepOut", { threadId });  // Await the request
+      await this.waitForThreadStopped(); // Then wait for the stopped event
       log.info("Stepped out of the current function call.");
     } catch (err) {
       log.error(`Failed to run command 'stepOut': ${String(err)}`);
@@ -312,10 +333,8 @@ export class DebugLoopController extends EventEmitter {
         log.debug("Cannot run command 'continue'. No active thread found.");
         return;
       }
-      await Promise.all([
-        session.customRequest("continue", { threadId }),
-        this.waitForThreadStopped(),
-      ]);
+      await session.customRequest("continue", { threadId }); // Await directly
+      await this.waitForThreadStopped(); // Then wait.
     } catch (err) {
       log.error(`Failed to run command 'continue': ${String(err)}`);
     }
@@ -325,7 +344,7 @@ export class DebugLoopController extends EventEmitter {
     const choice = completion?.choices?.[0];
     if (!choice) {
       log.debug(`No choice found in completion. ${JSON.stringify(completion)}`);
-      return { shouldContinue: true };
+      return;
     }
 
     const hasActiveBreakpoints = vscode.debug.breakpoints.some(
