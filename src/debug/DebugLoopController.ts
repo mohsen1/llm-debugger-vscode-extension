@@ -97,7 +97,7 @@ export class DebugLoopController extends EventEmitter {
     if (!shouldLoop) return;
 
     log.debug("Thinking..");
-    this.emit("spinner", { active: true });
+    this.emit("spinner", { active: true, message: "Handling exception" });
 
     const messageToSend = getExceptionMessage(this.sourceCodeCollector.gatherWorkspaceCode(), pausedState, stderr, stdout);
     log.debug("Message to LLM:", messageToSend);
@@ -131,7 +131,7 @@ export class DebugLoopController extends EventEmitter {
       vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
       this.previousBreakpoints = [];
     }
-    this.emit("spinner", { active: true });
+    this.emit("spinner", { active: true, message: "Setting initial breakpoints" });
     const structuredCode = this.sourceCodeCollector.gatherWorkspaceCode();
     const response = await callLlm(
       getInitialBreakpointsMessage(structuredCode),
@@ -160,7 +160,7 @@ export class DebugLoopController extends EventEmitter {
     if (!await this.shouldLoop()) return;
 
     log.debug("Thinking..");
-    this.emit("spinner", { active: true });
+    this.emit("spinner", { active: true, message: "Deciding the next step to take..." });
     const messageToSend = getPausedMessage(this.sourceCodeCollector.gatherWorkspaceCode(), pausedState);
     log.trace("Message to LLM:", messageToSend);
 
@@ -200,7 +200,10 @@ export class DebugLoopController extends EventEmitter {
     this.finished = true;
 
     log.debug("Debug session finished. Providing code fix and explanation");
-    this.emit("spinner", { active: true });
+    this.emit("spinner", {
+      active: true,
+      message: "Debug session finished. Providing code fix and explaination",
+    });
 
     try {
       let finalPrompt = "Debug session finished. Provide a code fix and explain your reasoning.";

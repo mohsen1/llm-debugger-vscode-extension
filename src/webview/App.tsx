@@ -16,7 +16,13 @@ interface AiFunctionCall {
 export function App() {
   const [debugEnabled, setDebugEnabled] = React.useState<boolean>(false);
   const [isInSession, setIsInSession] = React.useState<boolean>(false);
-  const [spinnerActive, setSpinnerActive] = React.useState<boolean>(false);
+  const [spinner, setSpinner] = React.useState<{
+    active: boolean;
+    message: string
+  }>({
+    active: false,
+    message: ""
+  });
   const [debugResuls, setDebugResults] = React.useState<string | null>(null);
   const [currentAiFunctionCall, setCurrentAiFunctionCall] = React.useState<AiFunctionCall | null>(null);
 
@@ -32,7 +38,7 @@ export function App() {
           setDebugEnabled(data.enabled);
           break;
         case "spinner":
-          setSpinnerActive(data.active);
+          setSpinner(data);
           break;
         case "isInSession":
           setIsInSession(data.isInSession);
@@ -66,8 +72,8 @@ export function App() {
         />
         <label htmlFor="debug-with-ai">Debug with AI</label>
       </div>
-      {currentAiFunctionCall && !spinnerActive && !debugResuls && <AiFunctionCallView {...currentAiFunctionCall} />}
-      {spinnerActive && <Thinking />}
+      {currentAiFunctionCall && !spinner && !debugResuls && <AiFunctionCallView {...currentAiFunctionCall} />}
+      {spinner.active && <Thinking message={spinner.message} />}
       {!isInSession && !debugResuls && <Help />}
       {debugResuls && <Results message={debugResuls} onClear={() => { setDebugResults(null) }} />}
     </div>
@@ -83,11 +89,11 @@ function AiFunctionCallView({ functionName, args, reason }: AiFunctionCall) {
   );
 }
 
-function Thinking() {
+function Thinking({message}: {message: string}) {
   return (
     <div className="thinking">
       <div className="spinner"></div>
-      <div className="text">Thinking</div>
+      <div className="text">{message}</div>
     </div>
   )
 }
