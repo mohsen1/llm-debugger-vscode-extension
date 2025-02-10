@@ -25,7 +25,7 @@
     "Debuggers"
   ],
   "main": "./out/index.js",
-  "icon": "res/icon.png",
+  "icon": "./res/icon.png",
   "files": [
     "out/*",
     "LICENSE.md",

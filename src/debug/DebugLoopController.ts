@@ -27,6 +27,7 @@ export class DebugLoopController extends EventEmitter {
   private finished = false;
   private session: vscode.DebugSession | null = null;
   private previousBreakpoints: vscode.Breakpoint[] = [];
+  private threadId: number | undefined;
 
   constructor(private sourceCodeCollector: SourceCodeCollector) {
     super();
@@ -45,16 +46,34 @@ export class DebugLoopController extends EventEmitter {
     this.session = session;
   }
 
+  setThreadId(threadId: number | undefined) {
+    this.threadId = threadId;
+  }
+
   async shouldLoop() {
-    // check if session has threads live
-    const threadsRequestResponse = await this.session?.customRequest("threads");
-    if (!threadsRequestResponse?.threads?.length) {
-      log.error("No threads found in session");
+    if (!this.session || !this.live) {
       return false;
     }
-    const llmDebuggerEnabled = vscode.workspace.getConfiguration("llm").get("debuggerEnabled", true);
-    log.debug(`Should loop? ${JSON.stringify({ live: this.live, session: this.session !== null, llmDebuggerEnabled })}`);
-    return this.live && this.session !== null && llmDebuggerEnabled;
+
+    // If we already have a threadId, use it
+    if (this.threadId) {
+      return true;
+    }
+
+    // Otherwise try to get thread info
+    try {
+      const threadsResponse = await this.session.customRequest("threads");
+      const threads = threadsResponse?.threads || [];
+      if (threads.length > 0) {
+        this.threadId = threads[0].id;
+        return true;
+      }
+    } catch (err) {
+      log.error("Error getting threads:", String(err));
+    }
+
+    log.error("No threads found in session");
+    return false;
   }
 
   async handleException(session: vscode.DebugSession) {
@@ -94,7 +113,7 @@ export class DebugLoopController extends EventEmitter {
   waitForThreadStopped() {
     log.debug("Waiting for thread to stop...");
     return new Promise<void>((resolve) => {
-      this.once("threadStopped", resolve); // Use once to avoid memory leaks
+      this.once("threadStopped", resolve);
     });
   }
 
@@ -102,6 +121,7 @@ export class DebugLoopController extends EventEmitter {
     log.debug("Setting initial breakpoints");
     if (removeExisting) {
       vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
+      this.previousBreakpoints = [];
     }
     this.emit("spinner", { active: true });
     const structuredCode = this.sourceCodeCollector.gatherWorkspaceCode();
@@ -109,28 +129,27 @@ export class DebugLoopController extends EventEmitter {
       getInitialBreakpointsMessage(structuredCode),
       breakpointFunctions,
     );
+
     await this.handleLlmFunctionCall(response);
     this.emit("spinner", { active: false });
   }
 
   reset() {
     this.session = null;
+    this.threadId = undefined;
     this.chat.clearHistory();
     this.live = false;
     this.finished = false;
   }
 
   async loop() {
-    let shouldLoop = await this.shouldLoop();
-    if (!shouldLoop) return;
+    if (!await this.shouldLoop()) return;
 
     log.debug("Gathering paused state");
     const debugState = new DebugState();
     const pausedState = await debugState.gatherPausedState(this.session!);
 
-    // checking again since while we were gathering paused state, the live flag could have been set to false
-    shouldLoop = await this.shouldLoop();
-    if (!shouldLoop) return;
+    if (!await this.shouldLoop()) return;
 
     log.debug("Thinking..");
     this.emit("spinner", { active: true });
@@ -139,6 +158,7 @@ export class DebugLoopController extends EventEmitter {
 
     const llmResponse = await this.chat.ask(messageToSend);
     this.emit("spinner", { active: false });
+
     if (!this.live) return;
 
     const [choice] = llmResponse.choices;
@@ -146,10 +166,8 @@ export class DebugLoopController extends EventEmitter {
     if (content) {
       log.info(content);
     }
-    
-    await this.handleLlmFunctionCall(llmResponse);
 
-    if (!this.live) return;
+    await this.handleLlmFunctionCall(llmResponse);
   }
 
   async clear() {
@@ -161,10 +179,9 @@ export class DebugLoopController extends EventEmitter {
     log.debug("Starting debug loop controller");
     this.live = true;
     this.emit("isInSession", { isInSession: true });
-    await this.setInitialBreakpoints();  // Set initial breakpoints
-    if (this.session) {
-      await this.session.customRequest("continue", { threadId: 1 }); // Continue execution
-    }
+    await this.setInitialBreakpoints();
+    log.debug('Initial breakpoints are set')
+    this.session?.customRequest('continue')
   }
 
   async finish() {
@@ -173,13 +190,12 @@ export class DebugLoopController extends EventEmitter {
 
     log.debug("Debug session finished. Providing code fix and explanation");
 
-    // Provide final fix explanation if wanted...
-    this.emit('spinner', { active: true });
+    this.emit("spinner", { active: true });
     const response = await this.chat.ask(
       "Debug session finished. Provide a code fix and explain your reasoning.",
       { withFunctions: false },
     );
-    this.emit('spinner', { active: false });
+    this.emit("spinner", { active: false });
     const [choice] = response.choices;
     const content = choice?.message?.content;
     if (content) {

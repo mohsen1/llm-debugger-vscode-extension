@@ -15,8 +15,11 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.debug.registerDebugAdapterTrackerFactory("*", {
       createDebugAdapterTracker(session) {
-        // Return a new tracker for EACH session. Do NOT reuse the same tracker.
-        return new DebugAdapterTracker(session, new DebugLoopController(sourceCodeCollector));
+        if (session.parentSession) {
+          log.debug('Not launching a DebugAdapterTracker for a child session')
+        }
+        // Use the SINGLE debugLoopController instance.
+        return new DebugAdapterTracker(session, debugLoopController);
       },
     })
   );

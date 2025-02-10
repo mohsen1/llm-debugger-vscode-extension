@@ -72,20 +72,35 @@ export function getExceptionMessage(
   const message = ["# Code:", serializeStructuredCode(structuredCode), ""];
 
   if (pausedState) {
-    const stack = pausedState.pausedStack.map((frame: StackFrame) => {
-      return `at ${frame.name} (${frame.source}:${frame.line}:${frame.column})`;
-    }).join("\n");
+    const stack = pausedState.pausedStack
+      .map(
+        (frame: StackFrame) =>
+          `at ${frame.name} (${frame.source}:${frame.line}:${frame.column})`,
+      )
+      .join("\n");
 
-    const exception = pausedState.topFrameVariables.find((scope: Scope) => scope.scopeName === 'Exception');
-    const exceptionValue = exception?.variables.find((v: Variable) => v.name === 'exception')?.value;
-    message.push("# Exception:", exceptionValue || "Unknown exception", stack);
+    // Find the 'Exception' scope and extract the exception details
+    const exceptionScope = pausedState.topFrameVariables.find(
+      (scope) => scope.scopeName === "Exception",
+    );
+    const exceptionValue = exceptionScope?.variables.find(
+      (v) => v.name === "exception",
+    )?.value;
+
+    message.push(
+      "# Exception:",
+      exceptionValue || "Unknown exception",
+      "",
+      "# Stack Trace:",
+      stack,
+    );
   }
 
   message.push(
     "# Instructions:",
-    "Debugger is in paused state due to an uncaught exception.",
-    "Analyze the exception and stack trace to understand the root cause.",
-    "Provide a code fix and explain your reasoning.",
+    "The program has stopped due to an uncaught exception.",
+    "Analyze the code, the exception details, and the stack trace to identify the cause.",
+    "Provide a code fix and explain your reasoning. Do *not* suggest further debugging actions.",
   );
 
   return message.join("\n");
