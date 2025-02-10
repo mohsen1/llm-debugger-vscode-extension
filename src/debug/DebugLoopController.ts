@@ -190,24 +190,26 @@ export class DebugLoopController extends EventEmitter {
 
     log.debug("Debug session finished. Providing code fix and explanation");
 
-    this.emit("spinner", { active: true });
-    const response = await this.chat.ask(
-      "Debug session finished. Provide a code fix and explain your reasoning.",
-      { withFunctions: false },
-    );
-    this.emit("spinner", { active: false });
-    const [choice] = response.choices;
-    const content = choice?.message?.content;
-    if (content) {
-      log.info(content);
-      this.emit("debugResults", { results: content });
-    } else {
-      log.info("No content from LLM");
+    this.emit("spinner", { active: true }); 
+    try {
+      const response = await this.chat.ask(
+        "Debug session finished. Provide a code fix and explain your reasoning.",
+        { withFunctions: false },
+      );
+      const [choice] = response.choices;
+      const content = choice?.message?.content;
+      if (content) {
+        log.info(content);
+        this.emit("debugResults", { results: content });
+      } else {
+        log.info("No content from LLM");
+      }
+    } finally {
+        this.emit("spinner", { active: false }); 
+        this.emit('isInSession', { isInSession: false }); 
+        this.stop();
     }
-    this.emit('isInSession', { isInSession: false });
-    this.stop();
   }
-
   stop() {
     this.live = false;
   }
