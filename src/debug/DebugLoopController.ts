@@ -1,19 +1,19 @@
+// src/debug/DebugLoopController.ts
 import { EventEmitter } from "node:events";
 import * as path from "node:path";
 import type { ChatCompletion } from "openai/resources";
 import * as vscode from "vscode";
+import { AIChat, callLlm } from "../ai/Chat";
 import {
-  breakpointFunctions,
-  debugFunctions,
+  allFunctions,
+  getExceptionMessage,
   getInitialBreakpointsMessage,
   getPausedMessage,
-  getExceptionMessage,
   systemMessage,
 } from "../ai/prompts";
-import { AIChat, callLlm } from "../ai/Chat";
-import logger from "../logger";
-import { DebugState } from "./DebugState";
 import { SourceCodeCollector } from "../context/SourceCodeCollector";
+import logger from "../logger";
+import { DebugState, PausedState } from "./DebugState";
 
 const log = logger.createSubLogger("DebugLoopController");
 
@@ -24,7 +24,7 @@ const log = logger.createSubLogger("DebugLoopController");
  */
 export class DebugLoopController extends EventEmitter {
   private live = false;
-  private finished = false;
+  private finished = false; // Add a flag to track if finish has been called
   private session: vscode.DebugSession | null = null;
   private previousBreakpoints: vscode.Breakpoint[] = [];
   private threadId: number | undefined;
@@ -33,10 +33,7 @@ export class DebugLoopController extends EventEmitter {
     super();
   }
 
-  private chat = new AIChat(systemMessage, [
-    ...breakpointFunctions,
-    ...debugFunctions,
-  ]);
+  private chat = new AIChat(systemMessage, allFunctions);
 
   setWorkspaceFolder(workspaceFolder: vscode.WorkspaceFolder) {
     this.sourceCodeCollector.setWorkspaceFolder(workspaceFolder);
@@ -76,13 +73,24 @@ export class DebugLoopController extends EventEmitter {
     return false;
   }
 
-  async handleException(session: vscode.DebugSession) {
+  async handleException(session: vscode.DebugSession, stderr: string, stdout: string) {
     log.debug("Handling exception...");
 
     if (session !== this.session) return;
     log.debug("Gathering paused state");
     const debugState = new DebugState();
-    const pausedState = await debugState.gatherPausedState(this.session!);
+    let pausedState: PausedState | undefined;
+    try {
+      pausedState = await debugState.gatherPausedState(this.session!);
+    } catch (error) {
+      log.error("Error gathering paused state", String(error));
+      // If we fail to get the paused state (most probably because program already exited) we make an empty state to continue
+      pausedState = {
+        breakpoints: [],
+        pausedStack: [],
+        topFrameVariables: [],
+      }
+    }
 
     // checking again since while we were gathering paused state, the live flag could have been set to false
     const shouldLoop = await this.shouldLoop();
@@ -91,7 +99,7 @@ export class DebugLoopController extends EventEmitter {
     log.debug("Thinking..");
     this.emit("spinner", { active: true });
 
-    const messageToSend = getExceptionMessage(this.sourceCodeCollector.gatherWorkspaceCode(), pausedState);
+    const messageToSend = getExceptionMessage(this.sourceCodeCollector.gatherWorkspaceCode(), pausedState, stderr, stdout);
     log.debug("Message to LLM:", messageToSend);
 
     const llmResponse = await this.chat.ask(messageToSend, { withFunctions: false });
@@ -127,7 +135,7 @@ export class DebugLoopController extends EventEmitter {
     const structuredCode = this.sourceCodeCollector.gatherWorkspaceCode();
     const response = await callLlm(
       getInitialBreakpointsMessage(structuredCode),
-      breakpointFunctions,
+      allFunctions
     );
 
     await this.handleLlmFunctionCall(response);
@@ -139,7 +147,7 @@ export class DebugLoopController extends EventEmitter {
     this.threadId = undefined;
     this.chat.clearHistory();
     this.live = false;
-    this.finished = false;
+    this.finished = false; // Reset the finished flag
   }
 
   async loop() {
@@ -154,7 +162,7 @@ export class DebugLoopController extends EventEmitter {
     log.debug("Thinking..");
     this.emit("spinner", { active: true });
     const messageToSend = getPausedMessage(this.sourceCodeCollector.gatherWorkspaceCode(), pausedState);
-    log.debug("Message to LLM:", messageToSend);
+    log.trace("Message to LLM:", messageToSend);
 
     const llmResponse = await this.chat.ask(messageToSend);
     this.emit("spinner", { active: false });
@@ -184,18 +192,23 @@ export class DebugLoopController extends EventEmitter {
     this.session?.customRequest('continue')
   }
 
-  async finish() {
-    if (this.finished) return;
+
+  async finish(exitReason?: string) {
+    if (this.finished) {
+      return; // Prevent multiple calls
+    }
     this.finished = true;
 
     log.debug("Debug session finished. Providing code fix and explanation");
+    this.emit("spinner", { active: true });
 
-    this.emit("spinner", { active: true }); 
     try {
-      const response = await this.chat.ask(
-        "Debug session finished. Provide a code fix and explain your reasoning.",
-        { withFunctions: false },
-      );
+      let finalPrompt = "Debug session finished. Provide a code fix and explain your reasoning.";
+      if (exitReason) {
+        finalPrompt = `${exitReason}\n\n${finalPrompt}`;
+      }
+
+      const response = await this.chat.ask(finalPrompt, { withFunctions: false });
       const [choice] = response.choices;
       const content = choice?.message?.content;
       if (content) {
@@ -204,12 +217,17 @@ export class DebugLoopController extends EventEmitter {
       } else {
         log.info("No content from LLM");
       }
+    } catch (error) {
+      log.error("Error during final LLM call:", String(error));
+      this.emit("debugResults", { results: `An error occurred while generating the final report: ${String(error)}` }); // Show error to the user!
     } finally {
-        this.emit("spinner", { active: false }); 
-        this.emit('isInSession', { isInSession: false }); 
-        this.stop();
+      this.emit("spinner", { active: false });
+      this.emit('isInSession', { isInSession: false });
+      this.stop();
     }
   }
+
+
   stop() {
     this.live = false;
   }
@@ -290,8 +308,8 @@ export class DebugLoopController extends EventEmitter {
         log.debug("Cannot run command 'next'. No active thread found.");
         return;
       }
-      await session.customRequest("next", { threadId }); // Await directly
-      await this.waitForThreadStopped(); // Then, wait for stop.
+      await session.customRequest("next", { threadId });
+      await this.waitForThreadStopped();
     } catch (err) {
       log.error(`Failed to run command 'next': ${String(err)}`);
     }
@@ -374,6 +392,11 @@ export class DebugLoopController extends EventEmitter {
     for (const toolCall of choice.message?.tool_calls || []) {
       const { name, arguments: argsStr } = toolCall.function;
       log.debug(`${name}(${argsStr && argsStr !== '{}' ? argsStr : ""})`);
+
+      const parsedArgs = argsStr ? JSON.parse(argsStr) : {};
+      const { reason, ...args } = parsedArgs;
+
+      this.emit('aiFunctionCall', { functionName: name, args, reason });
 
       switch (name) {
         case "setBreakpoint":

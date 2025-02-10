@@ -210,3 +210,17 @@ body {
     transform: rotate(360deg);
   }
 }
+
+
+.ai-function-call {
+  border: 1px solid var(--vscode-input-border);
+  margin-top: 1rem;
+  padding: 0.2rem;
+}
+
+.ai-function-call .function-name {
+  background: var(--vscode-input-background);
+  border-bottom: 1px solid var(--vscode-input-border);
+  padding: 4px;
+  font-family: var(--vscode-editor-font-family);
+}

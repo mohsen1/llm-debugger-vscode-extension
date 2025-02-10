@@ -29,7 +29,7 @@ interface PausedState {
 
 export const systemMessage: ChatCompletionSystemMessageParam = {
   role: "system",
-  content: "You are an AI assistant that decides debugging steps.",
+  content: "You are an AI assistant that decides debugging steps."
 };
 
 export function getInitialBreakpointsMessage(
@@ -68,6 +68,8 @@ export function getPausedMessage(
 export function getExceptionMessage(
   structuredCode: StructuredCode[],
   pausedState: PausedState,
+  stderr: string,
+  stdout: string
 ): string {
   const message = ["# Code:", serializeStructuredCode(structuredCode), ""];
 
@@ -93,6 +95,10 @@ export function getExceptionMessage(
       "",
       "# Stack Trace:",
       stack,
+      '# stderr',
+      stderr,
+      '# stdout',
+      stdout
     );
   }
 
@@ -134,6 +140,7 @@ export const debugLoopSystemMessage: ChatCompletionMessageParam = {
     "You are an AI assistant that decides debugging steps. suggest next action by calling a function",
 };
 
+
 export const breakpointFunctions: ChatCompletionTool[] = [
   {
     type: "function",
@@ -145,8 +152,9 @@ export const breakpointFunctions: ChatCompletionTool[] = [
         properties: {
           file: { type: "string" },
           line: { type: "number" },
+          reason: { type: "string", description: "Reason for taking this action. Maximum 30 words" },
         },
-        required: ["file", "line"],
+        required: ["file", "line", "reason"],
       },
     },
   },
@@ -157,8 +165,8 @@ export const breakpointFunctions: ChatCompletionTool[] = [
       description: "Removes a breakpoint from a specific file and line.",
       parameters: {
         type: "object",
-        properties: { file: { type: "string" }, line: { type: "number" } },
-        required: ["file", "line"],
+        properties: { file: { type: "string" }, line: { type: "number" }, reason: { type: "string", description: "Reason for taking this action. Maximum 30 words" }, },
+        required: ["file", "line", "reason"],
       },
     },
   },
@@ -170,7 +178,13 @@ export const debugFunctions: ChatCompletionTool[] = [
     function: {
       name: "next",
       description: "Step over the current line in the debugger.",
-      parameters: { type: "object", properties: {} },
+      parameters: {
+        type: "object",
+        required: ['reason'],
+        properties: {
+          reason: { type: "string", description: "Reason for taking this action. Maximum 30 words" },
+        }
+      },
     },
   },
   {
@@ -178,7 +192,13 @@ export const debugFunctions: ChatCompletionTool[] = [
     function: {
       name: "stepIn",
       description: "Step into the current function call in the debugger.",
-      parameters: { type: "object", properties: {} },
+      parameters: {
+        type: "object",
+        required: ['reason'],
+        properties: {
+          reason: { type: "string", description: "Reason for taking this action. Maximum 30 words" },
+        }
+      },
     },
   },
   {
@@ -186,7 +206,13 @@ export const debugFunctions: ChatCompletionTool[] = [
     function: {
       name: "stepOut",
       description: "Step out of the current function call in the debugger.",
-      parameters: { type: "object", properties: {} },
+      parameters: {
+        type: "object",
+        required: ['reason'],
+        properties: {
+          reason: { type: "string", description: "Reason for taking this action. Maximum 30 words" },
+        }
+      },
     },
   },
   {
@@ -194,7 +220,18 @@ export const debugFunctions: ChatCompletionTool[] = [
     function: {
       name: "continue",
       description: "Continue execution in the debugger.",
-      parameters: { type: "object", properties: {} },
+      parameters: {
+        type: "object",
+        required: ['reason'],
+        properties: {
+          reason: { type: "string", description: "Reason for taking this action. Maximum 30 words" },
+        }
+      },
     },
   },
+];
+
+export const allFunctions = [
+  ...breakpointFunctions,
+  ...debugFunctions,
 ];

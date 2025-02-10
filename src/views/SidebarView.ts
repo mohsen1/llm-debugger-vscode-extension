@@ -18,7 +18,7 @@ export class LlmDebuggerSidebarProvider implements vscode.WebviewViewProvider {
     this._extensionContext = context;
     this._extensionUri = context.extensionUri;
 
-    for (const command of ["spinner", "setDebugEnabled", "isInSession", "debugResults"]) {
+    for (const command of ["spinner", "setDebugEnabled", "isInSession", "debugResults", "aiFunctionCall"]) {
       this.debugLoopController.on(command, (data) => {
         log.debug(`command ${JSON.stringify(command)} with data ${JSON.stringify(data)}`);
         if (this._view) {

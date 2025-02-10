@@ -6,12 +6,12 @@ import { OpenAI } from "openai";
 import type { ChatCompletion } from "openai/resources/chat/completions";
 import type { ChatCompletionMessageParam, ChatCompletionTool } from "../types";
 import { initialBreakPointsSystemMessage } from "./prompts";
+import vscode from "vscode";
 
 export class AIChat {
   #messageHistory: ChatCompletionMessageParam[] = [];
+  #output = vscode.window.createOutputChannel("LLM Debugger (AI Chat)", {log: true});
   #functions: ChatCompletionTool[];
-  onSpinner?: (active: boolean) => void;
-
   constructor(
     systemMessage: ChatCompletionMessageParam,
     functions: ChatCompletionTool[],
@@ -25,23 +25,29 @@ export class AIChat {
   }
 
   async ask(message: string, { withFunctions = true } = {}) {
-    if (this.onSpinner) {
-      this.onSpinner(true);
-    }
+    this.#output.appendLine(''); // Add a new line
+    this.#output.appendLine('------------------------ USER ----------------------');
+    this.#output.info(`User: ${message}`);
+
     this.#messageHistory.push({ role: "user", content: message });
     try {
       const response = await callLlm(
         this.#messageHistory,
         withFunctions ? this.#functions : []
       );
-      if (this.onSpinner) {
-        this.onSpinner(false);
+      const responseMessage = response.choices[0].message;
+      this.#output.appendLine(''); // Add a new line
+      this.#output.appendLine('------------------------ AI ----------------------');
+      if (responseMessage.content) { 
+        this.#output.info(`AI: ${responseMessage.content}`);
+      }
+      if (responseMessage.tool_calls) {
+        for (const toolCall of responseMessage.tool_calls) {
+          this.#output.info(`AI FN: ${toolCall.function.name}(${toolCall.function.arguments === '{}' ? '' : toolCall.function.arguments})`);
+        }
       }
       return response;
     } catch (error) {
-      if (this.onSpinner) {
-        this.onSpinner(false);
-      }
       throw error;
     }
   }

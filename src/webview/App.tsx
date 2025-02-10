@@ -6,17 +6,28 @@ declare const vscodeApi: {
   postMessage(message: { command: string; enabled: boolean }): void;
 };
 
+
+interface AiFunctionCall {
+  functionName: string;
+  args: string;
+  reason: string;
+}
+
 export function App() {
   const [debugEnabled, setDebugEnabled] = React.useState<boolean>(false);
   const [isInSession, setIsInSession] = React.useState<boolean>(false);
   const [spinnerActive, setSpinnerActive] = React.useState<boolean>(false);
   const [dobugResults, setDebugResults] = React.useState<string | null>(null);
+  const [currentAiFunctionCall, setCurrentAiFunctionCall] = React.useState<AiFunctionCall | null>(null);
 
   // Listen to messages from the extension
   React.useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const data = event.data;
       switch (data?.command) {
+        case "aiFunctionCall":
+          setCurrentAiFunctionCall(data);
+          break;
         case "setDebugEnabled":
           setDebugEnabled(data.enabled);
           break;
@@ -55,9 +66,19 @@ export function App() {
         />
         <label htmlFor="debug-with-ai">Debug with AI</label>
       </div>
+      {currentAiFunctionCall && !spinnerActive && <AiFunctionCallView {...currentAiFunctionCall} />}
       {spinnerActive && <Thinking />}
       {!isInSession && !dobugResults && <Help />}
       {dobugResults && <Results message={dobugResults} onClear={() => { setDebugResults(null) }} />}
+    </div>
+  );
+}
+
+function AiFunctionCallView({ functionName, args, reason }: AiFunctionCall) {
+  return (
+    <div className="ai-function-call">
+      <div className="function-name">{functionName}()</div>
+      <div className="reason">{reason}</div>
     </div>
   );
 }
