@@ -165,9 +165,9 @@ export class DebugLoopController extends EventEmitter {
     log.trace("Message to LLM:", messageToSend);
 
     const llmResponse = await this.chat.ask(messageToSend);
-    this.emit("spinner", { active: false });
-
+    
     if (!this.live) return;
+    this.emit("spinner", { active: false });
 
     const [choice] = llmResponse.choices;
     const content = choice?.message?.content;
@@ -175,7 +175,7 @@ export class DebugLoopController extends EventEmitter {
       log.info(content);
     }
 
-    await this.handleLlmFunctionCall(llmResponse);
+    await this.handleLlmFunctionCall(llmResponse, true);
   }
 
   async clear() {
@@ -197,6 +197,7 @@ export class DebugLoopController extends EventEmitter {
     if (this.finished) {
       return; // Prevent multiple calls
     }
+    this.stop();
     this.finished = true;
 
     log.debug("Debug session finished. Providing code fix and explanation");
@@ -379,7 +380,7 @@ export class DebugLoopController extends EventEmitter {
     }
   }
 
-  async handleLlmFunctionCall(completion: ChatCompletion) {
+  async handleLlmFunctionCall(completion: ChatCompletion, continueAfterSettingBreakpoint = false) {
     const choice = completion?.choices?.[0];
     if (!choice) {
       log.debug(`No choice found in completion. ${JSON.stringify(completion)}`);
@@ -404,6 +405,9 @@ export class DebugLoopController extends EventEmitter {
       switch (name) {
         case "setBreakpoint":
           await this.setBreakpoint(argsStr);
+          if (continueAfterSettingBreakpoint) {
+            await this.session?.customRequest('continue');
+          }
           break;
         case "removeBreakpoint":
           await this.removeBreakpoint(argsStr);
