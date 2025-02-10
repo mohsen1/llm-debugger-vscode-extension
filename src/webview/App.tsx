@@ -17,7 +17,7 @@ export function App() {
   const [debugEnabled, setDebugEnabled] = React.useState<boolean>(false);
   const [isInSession, setIsInSession] = React.useState<boolean>(false);
   const [spinnerActive, setSpinnerActive] = React.useState<boolean>(false);
-  const [dobugResults, setDebugResults] = React.useState<string | null>(null);
+  const [debugResuls, setDebugResults] = React.useState<string | null>(null);
   const [currentAiFunctionCall, setCurrentAiFunctionCall] = React.useState<AiFunctionCall | null>(null);
 
   // Listen to messages from the extension
@@ -66,10 +66,10 @@ export function App() {
         />
         <label htmlFor="debug-with-ai">Debug with AI</label>
       </div>
-      {currentAiFunctionCall && !spinnerActive && <AiFunctionCallView {...currentAiFunctionCall} />}
+      {currentAiFunctionCall && !spinnerActive && !debugResuls && <AiFunctionCallView {...currentAiFunctionCall} />}
       {spinnerActive && <Thinking />}
-      {!isInSession && !dobugResults && <Help />}
-      {dobugResults && <Results message={dobugResults} onClear={() => { setDebugResults(null) }} />}
+      {!isInSession && !debugResuls && <Help />}
+      {debugResuls && <Results message={debugResuls} onClear={() => { setDebugResults(null) }} />}
     </div>
   );
 }
