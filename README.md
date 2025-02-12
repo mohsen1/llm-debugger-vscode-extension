@@ -2,6 +2,12 @@
 
 LLM Debugger is a VSCode extension that demonstrates the use of large language models (LLMs) for active debugging of programs. This project is a **proof of concept** developed as a research experiment and will not be actively maintained or further developed.
 
+
+
+https://github.com/user-attachments/assets/8052f75f-bc3f-4382-97f7-b1e01936df47
+
+
+
 ## Overview
 
 Traditional LLM-based debugging approaches analyze only static source code. With LLM Debugger, the LLM is provided with real-time runtime context including:
