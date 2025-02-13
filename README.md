@@ -23,12 +23,11 @@ graph TB
     subgraph "VSCode Editor"
         User[User] --> Editor[VSCode Editor]
         Editor --> DebugSession((Debug Session))
-        Editor -.-> LLMDebuggerExt[LLM Debugger Extension]:::extension
     end
 
     subgraph "LLM Debugger Extension"
-        LLMDebuggerExt --> Sidebar[Sidebar Panel]:::extensionComponent
-        DebugSession -.-> DebugAdapter[Debug Adapter Tracker]:::extensionComponent
+        DebugSession --> DebugAdapter[Debug Adapter Tracker]:::extensionComponent
+        DebugAdapter --> DebugSession
         DebugAdapter -- Debug State --> LLMClient[LLM Client]:::extensionComponent
         LLMClient -- Function Calls --> DebugAdapter
     end
@@ -45,7 +44,6 @@ graph TB
     classDef extensionComponent fill:#ddf,stroke:#336,stroke-width:1px;
     classDef externalService fill:#f9f,stroke:#333,stroke-width:2px;
 
-    style LLMDebuggerExt fill:#ccf,stroke:#336,stroke-width:3px
     style LLMClient fill:#ccf,stroke:#336,stroke-width:1px
     style LLM fill:#f9f,stroke:#636,stroke-width:2px
 ```
