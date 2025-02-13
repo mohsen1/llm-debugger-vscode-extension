@@ -20,45 +20,36 @@ This enriched context allows the LLM to diagnose bugs faster and more accurately
 
 ```mermaid
 graph LR
-    subgraph VSCodeEditor
-        A[User] -- Interacts with --> B(Editor)
-        B -- Text Editing, Debug Controls --> C{DebugSession}
-        B -- Extension API --> D[LLMDebuggerExtension]
-        style D fill:#ccf,stroke:#333,stroke-width:2px
+    subgraph "VSCode Editor"
+        User[User] --> Editor[VSCode Editor]
+        Editor --> DebugSession((Debug Session))
+        Editor -.-> LLMDebuggerExt[LLM Debugger Extension]:::extension
     end
 
-    subgraph LLMDebuggerExtension [LLM Debugger Extension]
-        D -- Manages --> E[DebugConfigurationProvider]
-        D -- Registers --> F[DebugAdapterTrackerFactory]
-        D -- Controls --> G[SidebarPanel]
-        E -- Provides Debug Config --> C
-        F -- Creates --> H[DebugAdapterTracker]
-        H -- Observes & Modifies --> C
-        H -- Sends Debug State --> I((LLMClient))
-        I -- Function Calls --> H
-        G -- Toggles, Displays --> D
-        style I fill:#f9f,stroke:#333,stroke-width:2px
+    subgraph "LLM Debugger Extension"
+        DebugSession -.-> DebugAdapter[Debug Adapter Tracker]:::extensionComponent
+        DebugAdapter -- Debug State --> LLMClient[LLM Client]:::extensionComponent
+        LLMClient -- Function Calls --> DebugAdapter
+        LLMDebuggerExt --> Sidebar[Sidebar Panel]:::extensionComponent
+
     end
 
-    subgraph ExternalServices
-        I -- API Request --> J[LargeLanguageModel]
-        J -- Debugging Suggestions --> I
+    subgraph "External Services"
+      LLMClient --- LLM[Large Language Model]
     end
 
-    C -- Standard Debug Protocol --> K[NodeJsDebugAdapter]
-    K -- Executes --> L[NodeJsApplication]
-    L -- Runtime Events, Variable Values --> K
-    K -- Debug Events --> H
+     DebugSession -- Debug Protocol --> NodeDebugAdapter[Node.js Debug Adapter]
+    NodeDebugAdapter -- Executes --> NodeApp[Node.js Application]
+    NodeApp -- Runtime Events --> NodeDebugAdapter
 
 
-    subgraph Workspace
-        M[WorkspaceState]
-        D -- Reads/Writes --> M
-    end
+    classDef extension fill:#eef,stroke:#336,stroke-width:2px;
+    classDef extensionComponent fill:#ddf,stroke:#336,stroke-width:1px;
+    classDef externalService fill:#f9f,stroke:#333,stroke-width:2px;
 
-    classDef highlight fill:#f96,stroke:#333,stroke-width:2px
-    class D highlight
-    class I highlight
+    style LLMDebuggerExt fill:#ccf,stroke:#336,stroke-width:3px
+    style LLMClient fill:#ccf,stroke:#336,stroke-width:1px
+    style LLM fill:#f9f,stroke:#636,stroke-width:2px
 ```
 
 ## Key Features
