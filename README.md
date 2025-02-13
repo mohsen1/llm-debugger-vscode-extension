@@ -39,13 +39,6 @@ graph TB
     NodeDebugAdapter -- Executes --> NodeApp[Node.js Application]
     NodeApp -- Runtime Events --> NodeDebugAdapter
 
-
-    classDef extension fill:#eef,stroke:#336,stroke-width:2px;
-    classDef extensionComponent fill:#ddf,stroke:#336,stroke-width:1px;
-    classDef externalService fill:#f9f,stroke:#333,stroke-width:2px;
-
-    style LLMClient fill:#ccf,stroke:#336,stroke-width:1px
-    style LLM fill:#f9f,stroke:#636,stroke-width:2px
 ```
 
 ## Key Features
