@@ -86,7 +86,7 @@ The extension maintains a single configuration flag (`llmDebuggerEnabled`) store
 You can install LLM Debugger in VSCode using the "Install from VSIX" feature:
 
 1. **Build the Extension Package:**
-   - Run the following command in the project root to buil the extension:
+   - Run the following command in the project root to build the extension:
      ```bash
      npm run build
      ```
