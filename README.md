@@ -20,19 +20,45 @@ This enriched context allows the LLM to diagnose bugs faster and more accurately
 
 ```mermaid
 graph LR
-    subgraph Editor
-        A[Editor]
-        B[Editor Extension]
+    subgraph VSCodeEditor
+        A[User] -- Interacts with --> B(Editor)
+        B -- Text Editing, Debug Controls --> C{DebugSession}
+        B -- Extension API --> D[LLMDebuggerExtension]
+        style D fill:#ccf,stroke:#333,stroke-width:2px
     end
-    subgraph LLM
-        C[Large Language Model]
+
+    subgraph LLMDebuggerExtension [LLM Debugger Extension]
+        D -- Manages --> E[DebugConfigurationProvider]
+        D -- Registers --> F[DebugAdapterTrackerFactory]
+        D -- Controls --> G[SidebarPanel]
+        E -- Provides Debug Config --> C
+        F -- Creates --> H[DebugAdapterTracker]
+        H -- Observes & Modifies --> C
+        H -- Sends Debug State --> I((LLMClient))
+        I -- Function Calls --> H
+        G -- Toggles, Displays --> D
+        style I fill:#f9f,stroke:#333,stroke-width:2px
     end
-    A --> B
-    B --> C
-    C --> B
-    B --> A
-    B -- Sends Debug State --> C
-    C -- Responds with Function Calls --> B
+
+    subgraph ExternalServices
+        I -- API Request --> J[LargeLanguageModel]
+        J -- Debugging Suggestions --> I
+    end
+
+    C -- Standard Debug Protocol --> K[NodeJsDebugAdapter]
+    K -- Executes --> L[NodeJsApplication]
+    L -- Runtime Events, Variable Values --> K
+    K -- Debug Events --> H
+
+
+    subgraph Workspace
+        M[WorkspaceState]
+        D -- Reads/Writes --> M
+    end
+
+    classDef highlight fill:#f96,stroke:#333,stroke-width:2px
+    class D highlight
+    class I highlight
 ```
 
 ## Key Features
