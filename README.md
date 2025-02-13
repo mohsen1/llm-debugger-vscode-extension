@@ -19,7 +19,7 @@ This enriched context allows the LLM to diagnose bugs faster and more accurately
 
 
 ```mermaid
-graph LR
+graph TB
     subgraph "VSCode Editor"
         User[User] --> Editor[VSCode Editor]
         Editor --> DebugSession((Debug Session))
@@ -27,17 +27,15 @@ graph LR
     end
 
     subgraph "LLM Debugger Extension"
+        LLMDebuggerExt --> Sidebar[Sidebar Panel]:::extensionComponent
         DebugSession -.-> DebugAdapter[Debug Adapter Tracker]:::extensionComponent
         DebugAdapter -- Debug State --> LLMClient[LLM Client]:::extensionComponent
         LLMClient -- Function Calls --> DebugAdapter
-        LLMDebuggerExt --> Sidebar[Sidebar Panel]:::extensionComponent
-
     end
 
     subgraph "External Services"
       LLMClient --- LLM[Large Language Model]
     end
-
      DebugSession -- Debug Protocol --> NodeDebugAdapter[Node.js Debug Adapter]
     NodeDebugAdapter -- Executes --> NodeApp[Node.js Application]
     NodeApp -- Runtime Events --> NodeDebugAdapter
