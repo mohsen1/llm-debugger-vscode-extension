@@ -1,0 +1,5 @@
+{
+  "name": "llm-debugger-benchmark-host",
+  "private": true,
+  "type": "commonjs"
+}
