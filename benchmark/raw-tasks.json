@@ -1,0 +1,177 @@
+[
+ {
+  "dir": "task-01",
+  "bugId": "sort-no-comparator",
+  "program": "task-01/run.js",
+  "symptom": "FAIL: rankTotals numeric order => got [10000,2000,5000,900], expected [900,2000,5000,10000]",
+  "depth": "shallow",
+  "expectedFile": "pricing.js",
+  "expectedLine": 22,
+  "checks": [
+   "rankTotals numeric order"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-02",
+  "bugId": "percent-floor",
+  "program": "task-02/run.js",
+  "symptom": "FAIL: SAVE10 discount rounding => got 389, expected 390",
+  "depth": "medium",
+  "expectedFile": "money.js",
+  "expectedLine": 11,
+  "checks": [
+   "SAVE10 discount rounding",
+   "big order discount rounded (2200)"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-03",
+  "bugId": "tax-on-subtotal",
+  "program": "task-03/run.js",
+  "symptom": "FAIL: big order tax on after-discount (704) => got 880, expected 704",
+  "depth": "medium",
+  "expectedFile": "pricing.js",
+  "expectedLine": 26,
+  "checks": [
+   "big order tax on after-discount (704)",
+   "tax on after-discount not subtotal"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-04",
+  "bugId": "shipping-threshold-strict",
+  "program": "task-04/run.js",
+  "symptom": "FAIL: shipping free at exactly 5000 => got 499, expected 0",
+  "depth": "shallow",
+  "expectedFile": "pricing.js",
+  "expectedLine": 29,
+  "checks": [
+   "shipping free at exactly 5000"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-05",
+  "bugId": "unawaited-prices",
+  "program": "task-05/run.js",
+  "symptom": "FAIL: async order total is finite number => got false, expected true",
+  "depth": "deep",
+  "expectedFile": "orders.js",
+  "expectedLine": 9,
+  "checks": [
+   "async order total is finite number",
+   "async order total matches sync"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-06",
+  "bugId": "merge-overwrites-qty",
+  "program": "task-06/run.js",
+  "symptom": "FAIL: cart merges duplicate lines => got [{\"id\":\"book\",\"qty\":2}], expected [{\"id\":\"book\",\"qty\":3}]",
+  "depth": "medium",
+  "expectedFile": "cart.js",
+  "expectedLine": 23,
+  "checks": [
+   "cart merges duplicate lines",
+   "pipeline books merged quantity"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-07",
+  "bugId": "holdkey-wrong-segment",
+  "program": "task-07/run.js",
+  "symptom": "FAIL: inventory release restores availability => got 198, expected 200",
+  "depth": "deep",
+  "expectedFile": "inventory.js",
+  "expectedLine": 8,
+  "checks": [
+   "inventory release restores availability"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-08",
+  "bugId": "coupon-order",
+  "program": "task-08/run.js",
+  "symptom": "FAIL: coupon percent applies before fixed => got 1450, expected 1500",
+  "depth": "medium",
+  "expectedFile": "coupons.js",
+  "expectedLine": 21,
+  "checks": [
+   "coupon percent applies before fixed"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-09",
+  "bugId": "freeship-single-only",
+  "program": "task-09/run.js",
+  "symptom": "FAIL: free shipping combines with discounts => got false, expected true",
+  "depth": "shallow",
+  "expectedFile": "coupons.js",
+  "expectedLine": 31,
+  "checks": [
+   "free shipping combines with discounts"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-10",
+  "bugId": "zip-prefix-two-digits",
+  "program": "task-10/run.js",
+  "symptom": "FAIL: zip rate resolves 3-digit prefix => got 0.08, expected 0.09",
+  "depth": "deep",
+  "expectedFile": "tax.js",
+  "expectedLine": 6,
+  "checks": [
+   "zip rate resolves 3-digit prefix"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-11",
+  "bugId": "weight-block-floor",
+  "program": "task-11/run.js",
+  "symptom": "FAIL: shipping rounds partial block up => got 499, expected 698",
+  "depth": "shallow",
+  "expectedFile": "shipping.js",
+  "expectedLine": 17,
+  "checks": [
+   "shipping rounds partial block up"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-12",
+  "bugId": "idempotency-key-per-attempt",
+  "program": "task-12/run.js",
+  "symptom": "FAIL: payment retry keeps one idempotency key => got 2, expected 1",
+  "depth": "medium",
+  "expectedFile": "payments.js",
+  "expectedLine": 8,
+  "checks": [
+   "payment retry keeps one idempotency key"
+  ],
+  "unexpectedFailures": []
+ },
+ {
+  "dir": "task-13",
+  "bugId": "ledger-gross-revenue",
+  "program": "task-13/run.js",
+  "symptom": "FAIL: ledger posts discounted revenue => got 5000, expected 4500",
+  "depth": "deep",
+  "expectedFile": "ledger.js",
+  "expectedLine": 4,
+  "checks": [
+   "ledger posts discounted revenue",
+   "ledger reconciles to charged total",
+   "pipeline ledger balances"
+  ],
+  "unexpectedFailures": []
+ }
+]
