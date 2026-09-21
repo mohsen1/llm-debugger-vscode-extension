@@ -80,7 +80,7 @@ export function App() {
   );
 }
 
-function AiFunctionCallView({ functionName, args, reason }: AiFunctionCall) {
+function AiFunctionCallView({ functionName, reason }: AiFunctionCall) {
   return (
     <div className="ai-function-call">
       <div className="function-name">{functionName}()</div>

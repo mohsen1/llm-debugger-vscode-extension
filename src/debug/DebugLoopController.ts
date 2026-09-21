@@ -1,5 +1,6 @@
 // src/debug/DebugLoopController.ts
 import { EventEmitter } from "node:events";
+import * as process from "node:process";
 import * as path from "node:path";
 import type { ChatCompletion } from "openai/resources";
 import * as vscode from "vscode";
@@ -14,6 +15,8 @@ import {
 import { SourceCodeCollector } from "../context/SourceCodeCollector";
 import logger from "../logger";
 import { DebugState, PausedState } from "./DebugState";
+import { decideHybridStep } from "../ai/hybridPolicy";
+import { getGatewayApiKey } from "../ai/gateway";
 
 const log = logger.createSubLogger("DebugLoopController");
 
@@ -75,6 +78,22 @@ export class DebugLoopController extends EventEmitter {
 
   async handleException(session: vscode.DebugSession, stderr: string, stdout: string) {
     log.debug("Handling exception...");
+    if (this.useJevHybrid()) {
+      try {
+        const hybrid = await decideHybridStep({
+          structuredCode: this.sourceCodeCollector.gatherWorkspaceCode(),
+          pausedState: { exceptionStderr: stderr.slice(0, 2000), exceptionStdout: stdout.slice(0, 2000) },
+          stderr,
+          stdout,
+          phase: "exception",
+          hasActiveBreakpoints: vscode.debug.breakpoints.some((bp) => bp.enabled),
+        });
+        log.info(hybrid.reason);
+        this.emit("aiFunctionCall", { functionName: "jevTriage", args: {}, reason: hybrid.reason.slice(0, 300) });
+      } catch (err) {
+        log.warn(`Jev exception triage failed: ${String(err).slice(0, 200)}`);
+      }
+    }
 
     if (session !== this.session) return;
     log.debug("Gathering paused state");
@@ -150,8 +169,71 @@ export class DebugLoopController extends EventEmitter {
     this.finished = false; // Reset the finished flag
   }
 
+  private useJevHybrid(): boolean {
+    if ((process.env.LLM_DEBUGGER_USE_JEV ?? "1") === "0") return false;
+    return !!getGatewayApiKey();
+  }
+
+  private async executeJevAction(action: string): Promise<boolean> {
+    switch (action) {
+      case "next":
+        await this.next();
+        return true;
+      case "stepIn":
+        await this.stepIn();
+        return true;
+      case "stepOut":
+        await this.stepOut();
+        return true;
+      case "continue": {
+        const hasActiveBreakpoints = vscode.debug.breakpoints.some((bp) => bp.enabled);
+        if (hasActiveBreakpoints) {
+          await this.continueExecution();
+          return true;
+        }
+        log.debug("Jev wanted continue but no active breakpoints; falling back to LLM.");
+        return false;
+      }
+      default:
+        return false;
+    }
+  }
+
   async loop() {
     if (!await this.shouldLoop()) return;
+
+    // --- Jev hybrid fast path (System One traffic cop) ---
+    if (this.useJevHybrid()) {
+      try {
+        const debugStatePre = new DebugState();
+        const pausedStatePre = await debugStatePre.gatherPausedState(this.session!);
+        if (!await this.shouldLoop()) return;
+        const hybrid = await decideHybridStep({
+          structuredCode: this.sourceCodeCollector.gatherWorkspaceCode(),
+          pausedState: pausedStatePre,
+          phase: "paused",
+          hasActiveBreakpoints: vscode.debug.breakpoints.some((bp) => bp.enabled),
+        });
+        log.info(hybrid.reason);
+        this.emit("aiFunctionCall", {
+          functionName: hybrid.jev.nextAction,
+          args: {},
+          reason: hybrid.reason.slice(0, 300),
+        });
+        // Direct actions need no LLM call — this is where Jev saves cost/latency.
+        if (["next", "stepIn", "stepOut", "continue"].includes(hybrid.jev.nextAction)) {
+          const handled = await this.executeJevAction(hybrid.jev.nextAction);
+          if (handled) return;
+          // else fall through to LLM path
+        } else if (hybrid.jev.nextAction === "finishWithFix") {
+          await this.finish("Jev determined sufficient evidence was gathered during stepping.");
+          return;
+        }
+        // setBreakpoint falls through to LLM below for precise file/line (what LLMs are good at).
+      } catch (err) {
+        log.warn(`Jev hybrid step failed, falling back to LLM: ${String(err).slice(0, 200)}`);
+      }
+    }
 
     log.debug("Gathering paused state");
     const debugState = new DebugState();
