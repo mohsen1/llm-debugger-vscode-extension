@@ -6,6 +6,7 @@ import { OpenAI } from "openai";
 import type { ChatCompletion } from "openai/resources/chat/completions";
 import type { ChatCompletionMessageParam, ChatCompletionTool } from "../types";
 import { initialBreakPointsSystemMessage } from "./prompts";
+import { callGatewayChat, getGatewayApiKey } from "./gateway";
 import vscode from "vscode";
 
 export class AIChat {
@@ -30,26 +31,22 @@ export class AIChat {
     this.#output.info(`User: ${message}`);
 
     this.#messageHistory.push({ role: "user", content: message });
-    try {
-      const response = await callLlm(
-        this.#messageHistory,
-        withFunctions ? this.#functions : []
-      );
-      const responseMessage = response.choices[0].message;
-      this.#output.appendLine(''); // Add a new line
-      this.#output.appendLine('------------------------ AI ----------------------');
-      if (responseMessage.content) { 
-        this.#output.info(`AI: ${responseMessage.content}`);
-      }
-      if (responseMessage.tool_calls) {
-        for (const toolCall of responseMessage.tool_calls) {
-          this.#output.info(`AI FN: ${toolCall.function.name}(${toolCall.function.arguments === '{}' ? '' : toolCall.function.arguments})`);
-        }
-      }
-      return response;
-    } catch (error) {
-      throw error;
+    const response = await callLlm(
+      this.#messageHistory,
+      withFunctions ? this.#functions : []
+    );
+    const responseMessage = response.choices[0].message;
+    this.#output.appendLine(''); // Add a new line
+    this.#output.appendLine('------------------------ AI ----------------------');
+    if (responseMessage.content) {
+      this.#output.info(`AI: ${responseMessage.content}`);
     }
+    if (responseMessage.tool_calls) {
+      for (const toolCall of responseMessage.tool_calls) {
+        this.#output.info(`AI FN: ${toolCall.function.name}(${toolCall.function.arguments === '{}' ? '' : toolCall.function.arguments})`);
+      }
+    }
+    return response;
   }
 }
 
@@ -66,6 +63,28 @@ export async function callLlm(
   } else {
     messages.push(initialBreakPointsSystemMessage);
     messages.push({ role: "user", content: promptOrMessages });
+  }
+
+  // Prefer Vercel AI Gateway (DeepSeek cheap-strong) when a gateway key exists.
+  // Falls back to direct OpenAI (gpt-4o) for backwards compatibility.
+  const gatewayKey = getGatewayApiKey();
+  if (gatewayKey) {
+    const { completion, modelUsed, fallbackUsed } = await callGatewayChat(
+      messages,
+      functions,
+      { maxTokens: 1000 },
+    );
+    try {
+      const promptCacheFile = path.join(os.homedir(), ".llm-debugger-prompt-cache.json");
+      if (!fs.existsSync(promptCacheFile)) {
+        fs.writeFileSync(promptCacheFile, JSON.stringify([], null, 2));
+      }
+      const entry = { at: new Date().toISOString(), model: modelUsed, fallbackUsed, messages, functions: (functions ?? []).map((f) => f.function.name) };
+      const prev = JSON.parse(fs.readFileSync(promptCacheFile, "utf-8"));
+      prev.push(entry);
+      fs.writeFileSync(promptCacheFile, JSON.stringify(prev.slice(-50), null, 2));
+    } catch { /* cache best-effort */ }
+    return completion;
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
