@@ -1,5 +1,3 @@
-/* eslint-disable no-undef */
-/* eslint-disable @typescript-eslint/no-require-imports */
 const process = require("node:process");
 const esbuild = require("esbuild");
 

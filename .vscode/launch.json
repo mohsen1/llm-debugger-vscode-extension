@@ -5,8 +5,12 @@
       "name": "Run Extension",
       "type": "extensionHost",
       "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
-      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/out/**/*.js"
+      ],
       "preLaunchTask": "npm: build"
     },
     {
@@ -16,10 +20,27 @@
       "runtimeExecutable": "${execPath}",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "${workspaceFolder}/examples/array"
+        "${workspaceFolder}/examples/order-processor"
       ],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js"
+      ],
       "preLaunchTask": "npm: dev"
+    },
+    {
+      "name": "Debug order-processor (LLM Debugger example)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/examples/order-processor/run.js",
+      "console": "integratedTerminal",
+      "breakOnUncaughtExceptions": true
+    },
+    {
+      "name": "Debug median (simple example)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/examples/numbers/median.js",
+      "console": "integratedTerminal"
     }
   ]
 }

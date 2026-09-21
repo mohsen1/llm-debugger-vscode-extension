@@ -2,3 +2,11 @@ packages:
   - playground
   - examples/*
   - src/webview
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  '@vscode/vsce-sign': true
+  esbuild: true
+  keytar: true
+  lmdb: true
+  msgpackr-extract: true

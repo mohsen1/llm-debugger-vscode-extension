@@ -43,14 +43,6 @@
         "type": "node"
       }
     ],
-    "viewsContainers": {
-      "debug": [
-        {
-          "id": "llmDebuggerSidebar",
-          "title": "LLM Debugger"
-        }
-      ]
-    },
     "views": {
       "debug": [
         {
@@ -64,19 +56,284 @@
       {
         "command": "llm-debugger.startLLMDebug",
         "title": "Start LLM Debug Session"
+      },
+      {
+        "command": "llm-debugger.invokeTool",
+        "title": "Invoke agent debug tool manually"
       }
     ],
     "configuration": {
       "type": "object",
       "title": "LLM Debugger",
-      "properties": {}
-    }
+      "properties": {
+        "llmDebugger.strategy": {
+          "type": "string",
+          "enum": [
+            "jev",
+            "llm"
+          ],
+          "default": "jev",
+          "description": "Bug-hunt brain for /use-debugger: 'jev' routes each step through the fast decision model (LLM writes only the final fix); 'llm' reasons every step with the generation model (slow baseline for comparison)."
+        },
+        "llmDebugger.jevProvider": {
+          "type": "string",
+          "enum": [
+            "typesafe",
+            "vercel"
+          ],
+          "default": "typesafe",
+          "description": "Where the fast decision model (Jev) is called. 'typesafe' talks to api.typesafe.ai directly; 'vercel' routes through the AI Gateway."
+        },
+        "llmDebugger.jevApiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "API key for the decision model. Empty falls back to `TYPESAFE_API_KEY` (direct) or `AI_GATEWAY_API_KEY` (gateway), from the environment or an `api.env` file."
+        },
+        "llmDebugger.jevModel": {
+          "type": "string",
+          "default": "jev-latest",
+          "description": "Decision model id. 'jev-latest' on the direct route, 'typesafe-ai/jev' through the gateway."
+        },
+        "llmDebugger.llmProvider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "vercel"
+          ],
+          "default": "openai",
+          "description": "Where the generation model is called. 'openai' talks to api.openai.com directly; 'vercel' routes through the AI Gateway."
+        },
+        "llmDebugger.llmApiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "API key for the generation model. Empty falls back to `OPENAI_API_KEY` (direct) or `AI_GATEWAY_API_KEY` (gateway), from the environment or an `api.env` file."
+        },
+        "llmDebugger.llmModel": {
+          "type": "string",
+          "default": "gpt-5.4-nano",
+          "markdownDescription": "Generation model: the opening hypothesis, breakpoint locations, expressions and the final fix. `gpt-5.4-nano` answers a routing decision in about a second and solves the whole benchmark when Jev does the routing. Reach for `gpt-5.6-sol` (with `llmReasoningEffort` above `none`) on code the fast model struggles to reason about."
+        },
+        "llmDebugger.gatewayBaseUrl": {
+          "type": "string",
+          "default": "https://ai-gateway.vercel.sh/v1",
+          "description": "Base URL of the Vercel AI Gateway OpenAI-compatible API."
+        },
+        "llmDebugger.llmReasoningEffort": {
+          "type": "string",
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ],
+          "default": "none",
+          "markdownDescription": "Reasoning effort for the generation model. `none` keeps the fast models fast; anything above it requires the direct OpenAI route, since a reasoning model refuses function tools on `/v1/chat/completions`."
+        },
+        "llmDebugger.openaiBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Override the OpenAI base URL (for a proxy or a compatible endpoint). Empty uses https://api.openai.com/v1."
+        },
+        "llmDebugger.typesafeBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Override the TypeSafe base URL. Empty uses https://api.typesafe.ai/v1."
+        }
+      }
+    },
+    "languageModelTools": [
+      {
+        "name": "llm-debugger_start",
+        "displayName": "Start debug session",
+        "modelDescription": "Start a Node.js debug session for a program and stop at entry. Use FIRST when asked to find a bug by debugging: the real VSCode debugger opens (breakpoints, yellow step line, variables, toolbar all on screen). Returns the entry paused state. Then set breakpoints and step.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "program": {
+              "type": "string",
+              "description": "Workspace-relative or absolute path to the file to debug"
+            }
+          }
+        },
+        "toolReferenceName": "debugStart",
+        "icon": "$(play)",
+        "tags": [
+          "debugging"
+        ],
+        "canBeReferencedInPrompt": true
+      },
+      {
+        "name": "llm-debugger_breakpoint",
+        "displayName": "Set breakpoint",
+        "modelDescription": "Set or remove a breakpoint shown as a red dot in the editor at a 1-based line. Use to mark where to pause and inspect runtime values, or to clean up.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string"
+            },
+            "line": {
+              "type": "number",
+              "description": "1-based line number"
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "set",
+                "remove"
+              ]
+            }
+          },
+          "required": [
+            "file",
+            "line"
+          ]
+        },
+        "toolReferenceName": "debugBreakpoint",
+        "icon": "$(debug-breakpoint)",
+        "tags": [
+          "debugging"
+        ],
+        "canBeReferencedInPrompt": true
+      },
+      {
+        "name": "llm-debugger_step",
+        "displayName": "Step debugger",
+        "modelDescription": "Advance the paused program one debugger step and return the new paused state (stack, variables, focused source). Kinds: next, in, out, continue. The editor highlight moves with each call.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "next",
+                "in",
+                "out",
+                "continue"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "toolReferenceName": "debugStep",
+        "icon": "$(debug-step-over)",
+        "tags": [
+          "debugging"
+        ],
+        "canBeReferencedInPrompt": true
+      },
+      {
+        "name": "llm-debugger_state",
+        "displayName": "Read debugger state",
+        "modelDescription": "Read current debugger state (paused stack, local variables, breakpoints, focused source, recent output) without moving execution. Call after each step.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "toolReferenceName": "debugState",
+        "icon": "$(eye)",
+        "tags": [
+          "debugging"
+        ],
+        "canBeReferencedInPrompt": true
+      },
+      {
+        "name": "llm-debugger_evaluate",
+        "displayName": "Evaluate expression",
+        "modelDescription": "Evaluate a JavaScript expression in the paused frame and return its value. The cheapest way to test a hypothesis about runtime state without stepping.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "expression": {
+              "type": "string",
+              "description": "Expression valid in the paused frame"
+            }
+          },
+          "required": [
+            "expression"
+          ]
+        },
+        "toolReferenceName": "debugEvaluate",
+        "icon": "$(symbol-variable)",
+        "tags": [
+          "debugging"
+        ],
+        "canBeReferencedInPrompt": true
+      },
+      {
+        "name": "llm-debugger_triage_jev",
+        "displayName": "Fast triage decision",
+        "modelDescription": "Ask the fast decision model (~300ms, near-free), what debugger action to take next from the paused state. Returns recommended action with confidence plus ready-for-fix probability. Prefer over slow reasoning for routine step routing.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "toolReferenceName": "debugFastTriage",
+        "icon": "$(zap)",
+        "tags": [
+          "debugging"
+        ],
+        "canBeReferencedInPrompt": true
+      },
+      {
+        "name": "llm-debugger_diagnose_llm",
+        "displayName": "Fast diagnosis",
+        "modelDescription": "Ask the fast LLM via Vercel AI Gateway (streams back fast) to analyze the paused state and propose the next action WITH parameters or write the code fix. Use for fix synthesis and explanations, not routine step routing.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string"
+            }
+          }
+        },
+        "toolReferenceName": "debugDiagnoseLlm",
+        "icon": "$(sparkle)",
+        "tags": [
+          "debugging",
+          "llm"
+        ],
+        "canBeReferencedInPrompt": true
+      },
+      {
+        "name": "llm-debugger_stop",
+        "displayName": "Stop debug session",
+        "modelDescription": "End the debug session. Returns final output plus cost ledger (steps, fast checks, LLM calls). Always call when the bug is found and explained.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "toolReferenceName": "debugStop",
+        "icon": "$(debug-stop)",
+        "tags": [
+          "debugging"
+        ],
+        "canBeReferencedInPrompt": true
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "llm-debugger.debugger",
+        "name": "debugger",
+        "fullName": "LLM Debugger",
+        "description": "Finds bugs by stepping the real debugger and reading live values",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "use-debugger",
+            "description": "Hunt a bug with live stepping. Usage: @debugger /use-debugger [program]"
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build:webview": "pnpm -F ./src/webview build",
     "dev:webview": "pnpm -F ./src/webview dev",
     "build:extension": "node esbuild.extension.js",
-    "build": "npm run build:extension && npm run build:webview",
+    "build": "npm run check:manifest && npm run build:extension && npm run build:webview",
     "dev:extension": "node esbuild.extension.js --watch",
     "dev": "rm -rf out && rm -rf src/webview/out && concurrently \"npm run dev:extension\" \"npm run dev:webview\"",
     "update": "vscode-ext-gen --output src/generated/meta.ts",
@@ -86,7 +343,13 @@
     "pack": "vsce package --no-dependencies",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp && pnpm publish"
+    "release": "bumpp && pnpm publish",
+    "check:manifest": "python3 scripts/check-manifest.py",
+    "test:host": "node benchmark/host/run.js --suite=target",
+    "bench": "node benchmark/run.js",
+    "bench:quick": "node benchmark/run.js --quick",
+    "verify:truth": "node benchmark/verify-ground-truth.js",
+    "demo": "node benchmark/demo.js"
   },
   "dependencies": {
     "@vscode/debugadapter": "^1.68.0",
@@ -104,11 +367,13 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/vscode": "1.96.0",
+    "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.0.0",
     "bumpp": "^9.5.1",
     "concurrently": "^8.2.0",
     "esbuild": "^0.24.2",
     "eslint": "^9.19.0",
+    "mocha": "^12.0.2",
     "process": "^0.11.10",
     "reactive-vscode": "^0.2.0",
     "typescript": "^5.5.4",
@@ -116,5 +381,9 @@
     "vite": "^5.4.1",
     "vitest": "^2.0.5",
     "vscode-ext-gen": "^0.4.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mohsen1/llm-debugger-vscode-extension"
   }
 }

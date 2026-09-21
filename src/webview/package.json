@@ -11,6 +11,9 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "parcel": "^2.13.3"
+    "parcel": "^2.13.3",
+    "@parcel/config-default": "^2.13.3",
+    "@parcel/namer-default": "^2.13.3",
+    "@parcel/resolver-default": "^2.13.3"
   }
 }

@@ -1,0 +1,7 @@
+{
+  "name": "llm-debugger-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zero-dependency MCP server that forwards debugger tools to the VSCode LLM-Debugger extension bridge."
+}

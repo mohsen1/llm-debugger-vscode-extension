@@ -122,3 +122,127 @@ Alternatively, if you prefer to load the extension directly from the source for 
 ---
 
 LLM Debugger is an experimental project showcasing how combining live debugging data with LLM capabilities can revolutionize traditional debugging practices.
+
+---
+
+## Jev hybrid mode
+
+One debugging loop, two brains. The loop drives the real VSCode debugger —
+breakpoints, the yellow step line, live variables — and at each step something
+has to answer *what should the debugger do next?*
+
+- **Jev** (`jev-latest`, `POST https://api.typesafe.ai/v1/systemone`) is a
+  System One model, not a generative one: you post the paused state plus typed
+  questions and get typed probabilistic answers back, every question evaluated
+  in parallel in one request. It routes each step and says whether the evidence
+  is enough yet.
+- **The generation model** (`gpt-5.6-sol` at reasoning effort `low`, via
+  OpenAI's `/v1/responses`) is woken only for what a classifier cannot produce:
+  the opening hypothesis, a breakpoint location, an expression to evaluate, and
+  the closing root cause and patch.
+- **Deterministic code owns policy** — the step budget, the wall-clock budget,
+  breakpoint validation, stall detection, never continuing with nothing bound,
+  and refusing a verdict that has not read a single runtime value. Neither model
+  gets a vote on those.
+
+Either brain can be pointed at the Vercel AI Gateway instead
+(`llmProvider` / `jevProvider` = `vercel`); the two routes do not speak the same
+dialect and `src/ai/jev.ts` and `src/ai/llm.ts` translate.
+
+Which brain routes is a setting (`llmDebugger.strategy`), so the same loop runs
+both arms of the benchmark and only the decision-maker differs.
+
+### Using it
+
+```bash
+cp api.env.example api.env   # add OPENAI_API_KEY and TYPESAFE_API_KEY (never commit it)
+```
+
+Then in any chat sidebar:
+
+- `@debugger` with a file open or attached — runs it, takes the first failing
+  check and hunts that.
+- `@debugger the async order total comes out NaN` — hunt a symptom you name.
+- `@debugger run.js` — name the program.
+
+Keys, models and route live in Settings → LLM Debugger (`llmProvider`,
+`llmModel`, `llmReasoningEffort`, `jevProvider`, `jevModel`, `strategy`);
+`api.env` is the fallback for the keys.
+
+### Benchmark
+
+`benchmark/` measures whether a run **actually fixed the bug**, not how fast a
+model answers. Each of the 13 tasks is the example with every bug fixed except
+one, so exactly one assertion fails; the agent is told only that assertion. A
+run counts as solved when its proposed patch applies, makes that assertion pass,
+and breaks nothing that was passing — checked by running the program.
+
+Two full runs, 13 tasks x 2 brains each, real debugger, real stepping:
+
+**`gpt-5.4-nano`, no reasoning — the default**
+
+| brain | solved | median run | debugger steps | generation calls | cost |
+|---|---|---|---|---|---|
+| `jev` | **13/13** | **12.8s** | 147 | 67 | **$0.055** |
+| `llm` | 11/13 | 92.5s | 513 | 540 | $0.243 |
+
+**`gpt-5.6-sol`, reasoning effort `low`**
+
+| brain | solved | median run | debugger steps | generation calls | cost |
+|---|---|---|---|---|---|
+| `jev` | 13/13 | 33.5s | 134 | 39 | $0.480 |
+| `llm` | 12/13 | 37.7s | 82 | 120 | $1.086 |
+
+Read across those and the routing argument makes itself twice, differently:
+
+- **With a frontier model, Jev saves money.** `sol` plans a better next move than
+  a classifier does, so it needs fewer debugger steps — but it pays for a
+  generation call on every one. Same result, 2.3x the cost.
+- **With a cheap model, Jev saves the task.** Left to route itself, `nano`
+  flails: 513 steps and 540 generation calls to solve 11/13. Hand the routing to
+  Jev and the same model solves 13/13 in 147 steps — a third of the work, and it
+  stops being wrong.
+
+The fast pairing is the interesting one: `jev` + `nano` matches `jev` + `sol`
+task for task at **a ninth of the cost and under half the wall-clock**. One
+honest regression — `nano` names the right file every time but lands within
+three lines of the bug on 9 of 13 rather than 13 of 13. The patch is still
+correct, so the solve stands; the cited line is just looser.
+
+Per-run detail: [benchmark/results.md](benchmark/results.md) (latest) and
+[benchmark/results-gpt-5.4-nano.md](benchmark/results-gpt-5.4-nano.md).
+
+```bash
+node benchmark/run.js --model=gpt-5.6-sol --effort=low   # sweep a different model
+```
+
+```bash
+pnpm verify:truth          # ground truth applies and isolates correctly (no models)
+pnpm bench:quick           # 3 tasks x 2 brains
+pnpm bench                 # all 13 tasks -> benchmark/results.md
+pnpm test:host             # debugger primitives against a real dev host
+```
+
+Results: [benchmark/results.md](benchmark/results.md) ·
+Details: [docs/jev-resources.md](docs/jev-resources.md) ·
+Example: [examples/order-processor/](examples/order-processor/)
+
+---
+
+## For AI coding assistants (Copilot / Claude / Codex)
+
+The live debugger is exposed as eight agent-callable tools, so another agent can
+hunt a bug in a visible session — red dots, yellow step line, variables, debug
+toolbar, all on screen:
+
+`llm-debugger_start`, `llm-debugger_breakpoint`, `llm-debugger_step`,
+`llm-debugger_state`, `llm-debugger_evaluate`, `llm-debugger_triage_jev`,
+`llm-debugger_diagnose_llm`, `llm-debugger_stop`
+
+- **In-process (Copilot):** registered as `languageModelTools` — ask, or
+  reference with `#debugStart`, `#debugEvaluate`, and so on.
+  Skill prompt: [docs/AGENT_SKILL.md](docs/AGENT_SKILL.md).
+- **Out-of-process (Claude Code, Codex CLI):** the same tools over MCP —
+  `claude mcp add llm-debugger -- node $PWD/mcp-server/server.mjs`.
+  The extension host must be running; it writes `.llm-debugger/bridge.json`
+  for discovery.

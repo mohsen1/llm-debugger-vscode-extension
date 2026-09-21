@@ -1,0 +1,45 @@
+{
+ "when": "2026-09-20T17:18:23.960Z",
+ "variants": [
+  {
+   "name": "bps-terminal",
+   "stopOnEntry": false,
+   "consoleMode": "integratedTerminal",
+   "setBreakpoints": true,
+   "leftoverBps": 3,
+   "program": "run.js",
+   "paused": null,
+   "stillAlive": true,
+   "where": "thread0:[pricing.js:22,run.js:17,<node_internals>/internal/modules/esm/module_job:437] ",
+   "continueOutcome": "continue-no-effect",
+   "events": [
+    "initialized",
+    "output",
+    "output",
+    "output",
+    "output"
+   ],
+   "outputPreview": ""
+  },
+  {
+   "name": "entry-terminal",
+   "stopOnEntry": true,
+   "consoleMode": "integratedTerminal",
+   "setBreakpoints": false,
+   "leftoverBps": 0,
+   "program": "run.js",
+   "paused": null,
+   "stillAlive": true,
+   "where": "threads-error:Error: No debugger available, can not send 'threads'",
+   "continueOutcome": "finished-after-continue",
+   "events": [
+    "initialized",
+    "output",
+    "output",
+    "output",
+    "terminated"
+   ],
+   "outputPreview": ""
+  }
+ ]
+}
