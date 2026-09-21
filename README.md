@@ -16,9 +16,13 @@ places its own breakpoints, steps down `coupons.js` line by line, and names the
 line that computes the wrong value. 26 debugger actions, 27 fast checks, **2**
 generation calls, about 17 seconds.
 
-<video src="https://github.com/mohsen1/llm-debugger-vscode-extension/raw/main/res/video/jev-hunt.mp4" controls muted loop width="100%"></video>
 
-[▶ Play the recording](res/video/jev-hunt.mp4) if it does not load inline.
+
+https://github.com/user-attachments/assets/51ccb308-a32c-427c-8767-7952f4caf875
+
+
+
+
 
 ### The original proof of concept
 
