@@ -1,12 +1,32 @@
 # LLM Debugger
 
-LLM Debugger is a VSCode extension that demonstrates the use of large language models (LLMs) for active debugging of programs. This project is a **proof of concept** developed as a research experiment and will not be actively maintained or further developed.
+A VSCode extension that finds bugs by *running* the code — driving the real
+debugger, setting breakpoints, stepping, and reading live values — rather than
+reading the source and guessing.
 
+Each step's "what next?" is answered by [Jev](https://docs.typesafe.ai/api), a
+typed System One model, for a fraction of a generation call. The generation
+model is woken only for what a classifier cannot produce: the opening
+hypothesis, a breakpoint location, an expression, and the final fix.
 
+### Hunting a coupon-stacking bug
+
+Told only `coupon percent applies before fixed => got 1450, expected 1500`, it
+places its own breakpoints, steps down `coupons.js` line by line, and names the
+line that computes the wrong value. 26 debugger actions, 27 fast checks, **2**
+generation calls, about 17 seconds.
+
+<video src="https://github.com/mohsen1/llm-debugger-vscode-extension/raw/main/res/video/jev-hunt.mp4" controls muted loop width="100%"></video>
+
+[▶ Play the recording](res/video/jev-hunt.mp4) if it does not load inline.
+
+### The original proof of concept
 
 https://github.com/user-attachments/assets/8052f75f-bc3f-4382-97f7-b1e01936df47
 
-
+This began as a **proof of concept** — a research experiment showing that an LLM
+given runtime context debugs better than one given source alone. It is not a
+supported product.
 
 ## Overview
 
@@ -41,51 +61,74 @@ graph TB
 
 ```
 
-## Key Features
+## What it does
 
-- **Active Debugging:** Integrates live debugging information (variables, stack traces, breakpoints) into the LLM’s context.
-- **Automated Breakpoint Management:** Automatically sets initial breakpoints based on code analysis and LLM recommendations.
-- **Runtime Inspection:** Monitors events like exceptions and thread stops, gathering detailed runtime state to guide debugging.
-- **Debug Operations:** Supports common debugging actions such as stepping over (`next`), stepping into (`stepIn`), stepping out (`stepOut`), and continuing execution.
-- **Synthetic Data Generation:** Captures interesting execution details to generate data that extends beyond static code analysis.
-- **Integrated UI:** Features a sidebar panel within the Run and Debug view that lets you toggle AI debugging and view live LLM suggestions and results.
+- **Debugs by running, not reading.** Breakpoints, stepping, live locals, and
+  expression evaluation in the paused frame — the same moves a person makes.
+- **Places its own breakpoints.** It is told the failing assertion and nothing
+  else; where to break and what to inspect are its decisions.
+- **Refuses to guess.** A verdict that has not read a runtime value is rejected
+  by the loop, so a run cannot finish by pattern-matching the error message.
+- **Ends with a patch, not prose.** The verdict is a root cause plus an exact
+  edit, which the benchmark applies and re-runs to decide whether it was right.
+- **Keeps a cost ledger.** Every run reports its debugger actions, fast checks,
+  generation calls and dollars.
 
-## Commands and Contributions
+## How it works
 
-- **Start LLM Debug Session:**  
-  - Command: `llm-debugger.startLLMDebug`  
-  - Description: Launches an AI-assisted debugging session. Once activated, the extension configures the debugging environment for Node.js sessions and starts gathering runtime data for LLM analysis.
+1. **Plan.** Given the failing assertion, the generation model gets one look at
+   the entry file and picks its opening breakpoints. Other modules' source is
+   withheld — handing over every file turns the exercise into code review.
+2. **Run.** The program launches under the real debugger and runs to the first
+   breakpoint.
+3. **Decide.** Each pause becomes an observation — stack, locals, source around
+   the line, program output, what has been tried. Jev routes the next action;
+   the generation model is asked only when the action needs a location or an
+   expression.
+4. **Act.** Step over, in, out, continue, break somewhere else, or evaluate an
+   expression. The editor highlight moves with every one.
+5. **Report.** On finish, the source of the files actually visited plus the
+   runtime values observed become a root cause and a minimal edit.
 
-- **Sidebar Panel:**  
-  - Location: Run and Debug view  
-  - ID: `llmDebuggerPanel`  
-  - Description: Displays the current state of the AI debugging session. Use the control panel to toggle "Debug with AI" mode. It shows live debugging insights, LLM function calls, and final debug results.
+Deterministic code owns what neither model should: the step and wall-clock
+budgets, breakpoint validation, stall detection, never continuing with nothing
+bound, and the evidence requirement above.
 
-- **Debug Configuration Provider & Debug Adapter Tracker:**  
-  - Automatically integrated with Node.js debug sessions.  
-  - Injects LLM context into the session by reading the workspace state flag `llmDebuggerEnabled` and automatically setting breakpoints and handling debug events (e.g., exceptions, thread stops).
-  - Supports LLM-guided commands for common operations like `next`, `stepIn`, `stepOut`, and `continue`.
+## Using it
+
+First, the keys:
+
+```bash
+cp api.env.example api.env   # add OPENAI_API_KEY and TYPESAFE_API_KEY (never commit it)
+```
+
+Then in any chat sidebar:
+
+- `@debugger` — runs the open or attached file, takes its first failing check
+  and hunts that.
+- `@debugger the async order total comes out NaN` — hunt a symptom you name.
+- `@debugger run.js` — name the program.
+
+It does not blindly trust the open editor: candidates are run once, and the one
+whose output actually reproduces the symptom wins. Pointing it at a module that
+exports functions nobody calls gets you an explanation, not a silent empty run.
 
 ## Configuration
 
-The extension maintains a single configuration flag (`llmDebuggerEnabled`) stored in the workspace state. This flag determines whether AI-assisted debugging is enabled. You can toggle this option via the sidebar panel. No additional settings are exposed in the Settings UI.
+Settings → LLM Debugger:
 
-## How It Works
+| setting | default | what it does |
+|---|---|---|
+| `strategy` | `jev` | who routes each step: `jev` or `llm` (the baseline) |
+| `llmProvider` | `openai` | `openai` direct, or `vercel` for the AI Gateway |
+| `llmModel` | `gpt-5.4-nano` | generation model |
+| `llmReasoningEffort` | `none` | `none`/`low`/`medium`/`high`; above `none` needs the direct route |
+| `jevProvider` | `typesafe` | `typesafe` direct, or `vercel` |
+| `jevModel` | `jev-latest` | decision model |
+| `llmApiKey` / `jevApiKey` | — | falls back to `OPENAI_API_KEY` / `TYPESAFE_API_KEY` from the environment or `api.env` |
 
-1. **Session Initialization:**  
-   When you launch a Node.js debug session (or use the command `llm-debugger.startLLMDebug`), the extension activates and attaches its debug adapter tracker to the session.
-
-2. **Breakpoint Management:**  
-   The extension automatically sets initial breakpoints based on an analysis of the workspace code. It then monitors runtime events to adjust breakpoints or trigger LLM actions as needed.
-
-3. **Runtime Inspection:**  
-   As the debug session progresses, the extension gathers live data including variable values, stack traces, and output (stderr/stdout). This data is sent to the LLM to determine the next debugging steps.
-
-4. **LLM Guidance and Action Execution:**  
-   The LLM processes the combined static and runtime context to suggest actions such as stepping through code or modifying breakpoints. These actions are executed automatically, streamlining the debugging process.
-
-5. **Session Termination:**  
-   When the debug session ends (either normally or due to an exception), the extension collects final runtime data and generates a summary with a code fix and explanation based on the LLM’s analysis.
+The sidebar panel in the Run and Debug view still drives the original
+autonomous loop, which only runs when you arm it there.
 
 ## Installation
 
@@ -108,23 +151,6 @@ Alternatively, if you prefer to load the extension directly from the source for 
 - Open the project folder in VSCode.
 - Run the **"Debug: Start Debugging"** command to launch a new Extension Development Host.
 
-## Use Cases
-
-- **Faster Bug Resolution:**  
-  The integration of runtime state with static code provides the LLM with a comprehensive view, enabling quicker identification of the root cause of issues.
-
-- **Enhanced Debugging Workflow:**  
-  Developers benefit from real-time, AI-driven insights that help navigate complex codebases and manage debugging tasks more efficiently.
-
-- **Research & Data Generation:**  
-  The tool can be used to generate synthetic runtime data for research purposes, offering new perspectives on program behavior that static analysis cannot capture.
-
----
-
-LLM Debugger is an experimental project showcasing how combining live debugging data with LLM capabilities can revolutionize traditional debugging practices.
-
----
-
 ## Jev hybrid mode
 
 One debugging loop, two brains. The loop drives the real VSCode debugger —
@@ -136,8 +162,8 @@ has to answer *what should the debugger do next?*
   questions and get typed probabilistic answers back, every question evaluated
   in parallel in one request. It routes each step and says whether the evidence
   is enough yet.
-- **The generation model** (`gpt-5.6-sol` at reasoning effort `low`, via
-  OpenAI's `/v1/responses`) is woken only for what a classifier cannot produce:
+- **The generation model** (`gpt-5.4-nano`, via OpenAI's `/v1/responses`) is
+  woken only for what a classifier cannot produce:
   the opening hypothesis, a breakpoint location, an expression to evaluate, and
   the closing root cause and patch.
 - **Deterministic code owns policy** — the step budget, the wall-clock budget,
@@ -151,23 +177,6 @@ dialect and `src/ai/jev.ts` and `src/ai/llm.ts` translate.
 
 Which brain routes is a setting (`llmDebugger.strategy`), so the same loop runs
 both arms of the benchmark and only the decision-maker differs.
-
-### Using it
-
-```bash
-cp api.env.example api.env   # add OPENAI_API_KEY and TYPESAFE_API_KEY (never commit it)
-```
-
-Then in any chat sidebar:
-
-- `@debugger` with a file open or attached — runs it, takes the first failing
-  check and hunts that.
-- `@debugger the async order total comes out NaN` — hunt a symptom you name.
-- `@debugger run.js` — name the program.
-
-Keys, models and route live in Settings → LLM Debugger (`llmProvider`,
-`llmModel`, `llmReasoningEffort`, `jevProvider`, `jevModel`, `strategy`);
-`api.env` is the fallback for the keys.
 
 ### Benchmark
 
