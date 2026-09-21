@@ -1,0 +1,5 @@
+{
+  "name": "llm-debugger-benchmark",
+  "private": true,
+  "type": "module"
+}

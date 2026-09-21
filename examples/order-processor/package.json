@@ -1,0 +1,7 @@
+{
+  "name": "order-processor-example",
+  "type": "module",
+  "scripts": {
+    "test": "node run.js"
+  }
+}

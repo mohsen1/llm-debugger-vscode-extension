@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug order-processor",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/run.js",
+      "console": "integratedTerminal",
+      "breakOnUncaughtExceptions": true
+    }
+  ]
+}

@@ -1,0 +1,176 @@
+{
+  "$comment": "Ground truth for examples/order-processor. Deliberately OUTSIDE the example directory so a debugging agent working in that folder cannot read the answers. Each entry is one distinct root cause; `checks` lists every assertion in run.js that it makes fail. `fix.search` must occur exactly once in `fix.file`.",
+  "example": "examples/order-processor",
+  "entry": "run.js",
+  "bugs": [
+    {
+      "id": "sort-no-comparator",
+      "file": "pricing.js",
+      "line": 22,
+      "depth": "shallow",
+      "rootCause": "rankTotals calls Array.prototype.sort() with no comparator, so cent totals are compared as strings and sort lexicographically instead of numerically.",
+      "checks": ["rankTotals numeric order"],
+      "fix": {
+        "file": "pricing.js",
+        "search": "  return totalsCents.slice().sort();",
+        "replace": "  return totalsCents.slice().sort((a, b) => a - b);"
+      }
+    },
+    {
+      "id": "percent-floor",
+      "file": "money.js",
+      "line": 11,
+      "depth": "medium",
+      "rootCause": "percentOf truncates with Math.floor instead of rounding to the nearest cent, so every percentage-based amount is short by up to one cent.",
+      "checks": ["SAVE10 discount rounding", "big order discount rounded (2200)"],
+      "fix": {
+        "file": "money.js",
+        "search": "  return Math.floor(resultDollars * 100);",
+        "replace": "  return Math.round(resultDollars * 100);"
+      }
+    },
+    {
+      "id": "tax-on-subtotal",
+      "file": "pricing.js",
+      "line": 26,
+      "depth": "medium",
+      "rootCause": "totalsFor computes tax from subtotalCents instead of the discounted amount, so customers are taxed on money they did not pay.",
+      "checks": ["big order tax on after-discount (704)", "tax on after-discount not subtotal"],
+      "fix": {
+        "file": "pricing.js",
+        "search": "  const taxCents = Math.round(subtotalCents * taxRate);\n  const afterDiscount = subtotalCents - discountCents;",
+        "replace": "  const afterDiscount = subtotalCents - discountCents;\n  const taxCents = Math.round(afterDiscount * taxRate);"
+      }
+    },
+    {
+      "id": "shipping-threshold-strict",
+      "file": "pricing.js",
+      "line": 29,
+      "depth": "shallow",
+      "rootCause": "The free-shipping test uses a strict > against the threshold, so an order landing on exactly $50.00 is charged shipping.",
+      "checks": ["shipping free at exactly 5000"],
+      "fix": {
+        "file": "pricing.js",
+        "search": "    afterDiscount > FREE_SHIPPING_THRESHOLD_CENTS ? 0 : STANDARD_SHIPPING_CENTS;",
+        "replace": "    afterDiscount >= FREE_SHIPPING_THRESHOLD_CENTS ? 0 : STANDARD_SHIPPING_CENTS;"
+      }
+    },
+    {
+      "id": "unawaited-prices",
+      "file": "orders.js",
+      "line": 9,
+      "depth": "deep",
+      "rootCause": "processOrderAsync maps fetchPriceCentsAsync without awaiting, so priceOf returns a Promise and every downstream amount becomes NaN.",
+      "checks": ["async order total is finite number", "async order total matches sync"],
+      "fix": {
+        "file": "orders.js",
+        "search": "  const prices = items.map((item) => fetchPriceCentsAsync(item.id));",
+        "replace": "  const prices = await Promise.all(items.map((item) => fetchPriceCentsAsync(item.id)));"
+      }
+    },
+    {
+      "id": "merge-overwrites-qty",
+      "file": "cart.js",
+      "line": 23,
+      "depth": "medium",
+      "rootCause": "normalizeLines assigns over the existing quantity when merging a duplicate line instead of summing, so repeat lines silently drop units.",
+      "checks": ["cart merges duplicate lines", "pipeline books merged quantity"],
+      "fix": {
+        "file": "cart.js",
+        "search": "      prev.qty = line.qty;",
+        "replace": "      prev.qty += line.qty;"
+      }
+    },
+    {
+      "id": "holdkey-wrong-segment",
+      "file": "inventory.js",
+      "line": 8,
+      "depth": "deep",
+      "rootCause": "holdKey reads segment [1] of `id:timestamp:index`, returning the timestamp, so releaseReservation deletes a key that was never held and stock is never restored.",
+      "checks": ["inventory release restores availability"],
+      "fix": {
+        "file": "inventory.js",
+        "search": "  return String(reservationId).split(\":\")[1];",
+        "replace": "  return String(reservationId).split(\":\")[0];"
+      }
+    },
+    {
+      "id": "coupon-order",
+      "file": "coupons.js",
+      "line": 21,
+      "depth": "medium",
+      "rootCause": "Fixed-amount coupons are subtracted before percent coupons, so the percentage applies to an already-reduced remainder and the total discount comes out low.",
+      "checks": ["coupon percent applies before fixed"],
+      "fix": {
+        "file": "coupons.js",
+        "search": "  for (const cents of fixed) {\n    const d = Math.min(cents, remaining);\n    fixedTotal += d;\n    remaining -= d;\n  }\n  for (const rate of pct) {\n    const d = Math.round(remaining * rate);\n    pctTotal += d;\n    remaining -= d;\n  }",
+        "replace": "  for (const rate of pct) {\n    const d = Math.round(remaining * rate);\n    pctTotal += d;\n    remaining -= d;\n  }\n  for (const cents of fixed) {\n    const d = Math.min(cents, remaining);\n    fixedTotal += d;\n    remaining -= d;\n  }"
+      }
+    },
+    {
+      "id": "freeship-single-only",
+      "file": "coupons.js",
+      "line": 31,
+      "depth": "shallow",
+      "rootCause": "The free-shipping flag is only returned when SHIPFREE is the sole code, so it is dropped whenever it is stacked with any other coupon.",
+      "checks": ["free shipping combines with discounts"],
+      "fix": {
+        "file": "coupons.js",
+        "search": "  if (list.length === 1 && freeShip) {\n    return { discountCents: pctTotal + fixedTotal, remainingCents: remaining, freeShip: true };\n  }\n  return { discountCents: pctTotal + fixedTotal, remainingCents: remaining, freeShip: false };",
+        "replace": "  return { discountCents: pctTotal + fixedTotal, remainingCents: remaining, freeShip };"
+      }
+    },
+    {
+      "id": "zip-prefix-two-digits",
+      "file": "tax.js",
+      "line": 6,
+      "depth": "deep",
+      "rootCause": "rateForZip slices two characters off the zip before handing it to the rate service, which looks up a 3-digit prefix, so every jurisdiction silently falls back to the default rate.",
+      "checks": ["zip rate resolves 3-digit prefix"],
+      "fix": {
+        "file": "tax.js",
+        "search": "  return fetchTaxRateForZipAsync(String(zip ?? \"\").slice(0, 2));",
+        "replace": "  return fetchTaxRateForZipAsync(String(zip ?? \"\").slice(0, 3));"
+      }
+    },
+    {
+      "id": "weight-block-floor",
+      "file": "shipping.js",
+      "line": 17,
+      "depth": "shallow",
+      "rootCause": "Weight blocks are floored, so any partially started 500g block over the allowance ships free instead of charging a full block.",
+      "checks": ["shipping rounds partial block up"],
+      "fix": {
+        "file": "shipping.js",
+        "search": "  const blocks = Math.floor(extra / WEIGHT_BLOCK_GRAMS);",
+        "replace": "  const blocks = Math.ceil(extra / WEIGHT_BLOCK_GRAMS);"
+      }
+    },
+    {
+      "id": "idempotency-key-per-attempt",
+      "file": "payments.js",
+      "line": 8,
+      "depth": "medium",
+      "rootCause": "The idempotency key is rebuilt inside the retry loop, so each attempt carries a different key and the gateway records a retry as a second charge.",
+      "checks": ["payment retry keeps one idempotency key"],
+      "fix": {
+        "file": "payments.js",
+        "search": "  for (let attempt = 1; attempt <= maxAttempts; attempt++) {\n    const key = `ch_${attempt}_${Date.now()}`;\n    try {",
+        "replace": "  const key = `ch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;\n  for (let attempt = 1; attempt <= maxAttempts; attempt++) {\n    try {"
+      }
+    },
+    {
+      "id": "ledger-gross-revenue",
+      "file": "ledger.js",
+      "line": 4,
+      "depth": "deep",
+      "rootCause": "recordSale posts gross subtotal as revenue instead of the discounted merchandise amount, so the entries overstate revenue by the discount and never reconcile to the charged total.",
+      "checks": ["ledger posts discounted revenue", "ledger reconciles to charged total", "pipeline ledger balances"],
+      "fix": {
+        "file": "ledger.js",
+        "search": "  entries.push({ account: \"revenue\", amount: subtotal });",
+        "replace": "  entries.push({ account: \"revenue\", amount: subtotal - discount });"
+      }
+    }
+  ]
+}
